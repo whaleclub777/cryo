@@ -395,8 +395,8 @@ mod tests {
     use std::path::PathBuf;
 
     use alloy::{
-        providers::{IpcConnect, ProviderBuilder},
-        transports::ipc::MockIpcServer,
+        providers::{Provider, ProviderBuilder},
+        transports::ipc::{IpcConnect, MockIpcServer},
     };
 
     use super::*;
@@ -412,7 +412,7 @@ mod tests {
         mock_ipc_path: PathBuf,
     ) {
         let ipc = IpcConnect::new(mock_ipc_path);
-        let provider = ProviderBuilder::new().on_ipc(ipc).await.unwrap().boxed();
+        let provider = ProviderBuilder::new().connect_ipc(ipc).await.unwrap().erased();
         let source = Source {
             provider,
             semaphore: Arc::new(None),
@@ -478,7 +478,7 @@ mod tests {
         mock_ipc_path: PathBuf,
     ) {
         let ipc = IpcConnect::new(mock_ipc_path);
-        let provider = ProviderBuilder::new().on_ipc(ipc).await.unwrap().boxed();
+        let provider = ProviderBuilder::new().connect_ipc(ipc).await.unwrap().erased();
         let source = Arc::new(Source {
             provider,
             chain_id: 1,
@@ -554,8 +554,11 @@ mod tests {
         tests: Vec<(BlockNumberTest<'_>, bool)>,
         mock_ipc_path: PathBuf,
     ) {
-        let provider =
-            ProviderBuilder::new().on_ipc(IpcConnect::new(mock_ipc_path)).await.unwrap().boxed();
+        let provider = ProviderBuilder::new()
+            .connect_ipc(IpcConnect::new(mock_ipc_path))
+            .await
+            .unwrap()
+            .erased();
         let source = Source {
             provider,
             semaphore: Arc::new(None),

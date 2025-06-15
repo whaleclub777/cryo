@@ -62,8 +62,7 @@ impl LogDecoder {
             .collect();
 
         for log in logs {
-            match self.event.decode_log_parts(log.topics().to_vec(), log.data().data.as_ref(), true)
-            {
+            match self.event.decode_log_parts(log.topics().to_vec(), log.data().data.as_ref()) {
                 Ok(decoded) => {
                     for (idx, param) in decoded.indexed.into_iter().enumerate() {
                         map.entry(indexed_keys[idx].clone()).or_default().push(param);

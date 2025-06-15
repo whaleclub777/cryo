@@ -93,7 +93,7 @@ impl CollectByBlock for Transactions {
         // filter by from_address
         let from_filter: Box<dyn Fn(&Transaction) -> bool + Send> =
             if let Some(from_address) = &request.from_address {
-                Box::new(move |tx| tx.from == Address::from_slice(from_address))
+                Box::new(move |tx| tx.inner.signer() == Address::from_slice(from_address))
             } else {
                 Box::new(|_| true)
             };
@@ -228,7 +228,7 @@ pub(crate) fn process_transaction(
     store!(schema, columns, block_number, tx.block_number.map(|x| x as u32));
     store!(schema, columns, transaction_index, tx.transaction_index);
     store!(schema, columns, transaction_hash, tx.inner.tx_hash().to_vec());
-    store!(schema, columns, from_address, tx.from.to_vec());
+    store!(schema, columns, from_address, tx.inner.signer().to_vec());
     store!(
         schema,
         columns,
@@ -277,7 +277,7 @@ pub(crate) fn process_transaction(
 }
 
 fn get_max_fee_per_gas(tx: &Transaction) -> Option<u64> {
-    match &tx.inner {
+    match tx.inner.as_ref() {
         alloy::consensus::TxEnvelope::Legacy(_) => None,
         alloy::consensus::TxEnvelope::Eip2930(_) => None,
         _ => Some(tx.inner.max_fee_per_gas() as u64),
@@ -285,7 +285,7 @@ fn get_max_fee_per_gas(tx: &Transaction) -> Option<u64> {
 }
 
 pub(crate) fn get_gas_price(block: &Block, tx: &Transaction) -> Option<u64> {
-    match &tx.inner {
+    match tx.inner.as_ref() {
         alloy::consensus::TxEnvelope::Legacy(_) => tx.gas_price().map(|gas_price| gas_price as u64),
         alloy::consensus::TxEnvelope::Eip2930(_) => {
             tx.gas_price().map(|gas_price| gas_price as u64)
