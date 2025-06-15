@@ -579,8 +579,7 @@ fn format_float(number: f64) -> String {
         return format!("{}.0", int_part.separate_with_commas())
     }
 
-    let frac_str =
-        format!("{frac_part:0>decimal_places$}").trim_end_matches('0').to_string();
+    let frac_str = format!("{frac_part:0>decimal_places$}").trim_end_matches('0').to_string();
 
     format!("{}.{}", int_part.separate_with_commas(), frac_str)
 }
