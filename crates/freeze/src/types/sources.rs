@@ -342,10 +342,7 @@ impl Source {
         kind: BlockTransactionsKind,
     ) -> Result<Option<Block>> {
         let _permit = self.permit_request().await;
-        let block_result = match kind {
-            BlockTransactionsKind::Full => self.provider.get_block(block_num.into()).await,
-            BlockTransactionsKind::Hashes => self.provider.get_block(block_num.into()).await,
-        };
+        let block_result = self.provider.get_block(block_num.into()).kind(kind).await;
         Self::map_err(block_result)
     }
 
@@ -356,10 +353,7 @@ impl Source {
         kind: BlockTransactionsKind,
     ) -> Result<Option<Block>> {
         let _permit = self.permit_request().await;
-        let block_result = match kind {
-            BlockTransactionsKind::Full => self.provider.get_block(block_hash.into()).await,
-            BlockTransactionsKind::Hashes => self.provider.get_block(block_hash.into()).await,
-        };
+        let block_result = self.provider.get_block(block_hash.into()).kind(kind).await;
         Self::map_err(block_result)
     }
 
