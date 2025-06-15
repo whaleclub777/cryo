@@ -20,7 +20,7 @@ pub(crate) async fn parse_blocks(
         for path in files {
             let column = if path.contains(':') {
                 path.split(':')
-                    .last()
+                    .next_back()
                     .ok_or(ParseError::ParseError("could not parse txs path column".to_string()))?
             } else {
                 "block_number"
@@ -498,11 +498,11 @@ mod tests {
                     );
                 }
                 BlockInputTest::WithoutMock((inputs, expected)) => {
-                    println!("RES {:?}", res);
-                    println!("inputs {:?}", inputs);
-                    println!("EXPECTED {:?}", expected);
+                    println!("RES {res:?}");
+                    println!("inputs {inputs:?}");
+                    println!("EXPECTED {expected:?}");
                     let actual = block_input_test_executor(inputs, expected, source.clone()).await;
-                    println!("ACTUAL {:?}", actual);
+                    println!("ACTUAL {actual:?}");
                     assert_eq!(actual, res);
                 }
             }
@@ -518,8 +518,8 @@ mod tests {
         assert_eq!(block_chunks.len(), expected.len());
         for (i, block_chunk) in block_chunks.iter().enumerate() {
             let expected_chunk = &expected[i];
-            println!("BLOCK_CHUNK {:?}", block_chunk);
-            println!("EXCPECTED_CHUNK {:?}", expected_chunk);
+            println!("BLOCK_CHUNK {block_chunk:?}");
+            println!("EXCPECTED_CHUNK {expected_chunk:?}");
             match expected_chunk {
                 BlockChunk::Numbers(expected_block_numbers) => {
                     assert!(matches!(block_chunk, BlockChunk::Numbers { .. }));

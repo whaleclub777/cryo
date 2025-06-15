@@ -512,12 +512,12 @@ impl Source {
             ..Default::default()
         };
         let _permit = self.permit_request().await;
-        if block_number.is_some() {
+        if let Some(bn) = block_number {
             Self::map_err(
                 self.provider
                     .trace_call(&transaction)
                     .trace_types(trace_type.clone())
-                    .block_id(block_number.unwrap().into())
+                    .block_id(bn.into())
                     .await,
             )
         } else {
@@ -587,15 +587,13 @@ impl Source {
                     GethTrace::JS(value) => calls.push(value),
                     _ => {
                         return Err(CollectError::CollectError(format!(
-                            "invalid trace result in tx {:?}",
-                            tx_hash
+                            "invalid trace result in tx {tx_hash:?}"
                         )))
                     }
                 },
                 TraceResult::Error { error, tx_hash } => {
                     return Err(CollectError::CollectError(format!(
-                        "invalid trace result in tx {:?}: {}",
-                        tx_hash, error
+                        "invalid trace result in tx {tx_hash:?}: {error}"
                     )))
                 }
             }
@@ -620,15 +618,13 @@ impl Source {
                     GethTrace::Default(frame) => calls.push(frame),
                     _ => {
                         return Err(CollectError::CollectError(format!(
-                            "invalid trace result in tx {:?}",
-                            tx_hash
+                            "invalid trace result in tx {tx_hash:?}"
                         )))
                     }
                 },
                 TraceResult::Error { error, tx_hash } => {
                     return Err(CollectError::CollectError(format!(
-                        "inalid trace result in tx {:?}: {}",
-                        tx_hash, error
+                        "inalid trace result in tx {tx_hash:?}: {error}"
                     )));
                 }
             }
@@ -660,15 +656,13 @@ impl Source {
                     GethTrace::NoopTracer(_) => {}
                     _ => {
                         return Err(CollectError::CollectError(format!(
-                            "invalid trace result in tx {:?}",
-                            tx_hash
+                            "invalid trace result in tx {tx_hash:?}"
                         )))
                     }
                 },
                 TraceResult::Error { error, tx_hash } => {
                     return Err(CollectError::CollectError(format!(
-                        "invalid trace result in tx {:?}: {}",
-                        tx_hash, error
+                        "invalid trace result in tx {tx_hash:?}: {error}"
                     )));
                 }
             }
@@ -698,15 +692,13 @@ impl Source {
                     GethTrace::PreStateTracer(PreStateFrame::Default(frame)) => calls.push(frame.0),
                     _ => {
                         return Err(CollectError::CollectError(format!(
-                            "invalid trace result in tx {:?}",
-                            tx_hash
+                            "invalid trace result in tx {tx_hash:?}"
                         )))
                     }
                 },
                 TraceResult::Error { error, tx_hash } => {
                     return Err(CollectError::CollectError(format!(
-                        "invalid trace result in tx {:?}: {}",
-                        tx_hash, error
+                        "invalid trace result in tx {tx_hash:?}: {error}"
                     )));
                 }
             }
@@ -741,15 +733,13 @@ impl Source {
                     GethTrace::CallTracer(frame) => calls.push(frame),
                     _ => {
                         return Err(CollectError::CollectError(format!(
-                            "invalid trace result in tx {:?}",
-                            tx_hash
+                            "invalid trace result in tx {tx_hash:?}"
                         )))
                     }
                 },
                 TraceResult::Error { error, tx_hash } => {
                     return Err(CollectError::CollectError(format!(
-                        "invalid trace result in tx {:?}: {}",
-                        tx_hash, error
+                        "invalid trace result in tx {tx_hash:?}: {error}"
                     )));
                 }
             }
@@ -787,17 +777,15 @@ impl Source {
                         diffs.push(diff);
                     }
                     _ => {
-                        println!("{:?}", result);
+                        println!("{result:?}");
                         return Err(CollectError::CollectError(format!(
-                            "invalid trace result in tx {:?}",
-                            tx_hash
+                            "invalid trace result in tx {tx_hash:?}"
                         )));
                     }
                 },
                 TraceResult::Error { error, tx_hash } => {
                     return Err(CollectError::CollectError(format!(
-                        "invalid trace result in tx {:?}: {}",
-                        tx_hash, error
+                        "invalid trace result in tx {tx_hash:?}: {error}"
                     )));
                 }
             }

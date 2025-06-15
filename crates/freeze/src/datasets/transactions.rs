@@ -255,7 +255,7 @@ pub(crate) fn process_transaction(
     }
     // in alloy eip2718_encoded_length is rlp_encoded_length
     store!(schema, columns, n_rlp_bytes, tx.inner.eip2718_encoded_length() as u32);
-    store!(schema, columns, gas_used, receipt.as_ref().map(|r| r.gas_used as u64));
+    store!(schema, columns, gas_used, receipt.as_ref().map(|r| r.gas_used));
     // store!(schema, columns, gas_price, Some(receipt.unwrap().effective_gas_price as u64));
     store!(schema, columns, gas_price, gas_price);
     store!(schema, columns, transaction_type, tx.inner.tx_type() as u32);
@@ -310,9 +310,9 @@ fn tx_success(tx: &Transaction, receipt: &Option<TransactionReceipt>) -> R<bool>
         if let Some(r) = receipt {
             Ok(r.gas_used == 0)
         } else {
-            return Err(err("could not determine status of transaction"))
+            Err(err("could not determine status of transaction"))
         }
     } else {
-        return Err(err("could not determine status of transaction"))
+        Err(err("could not determine status of transaction"))
     }
 }
