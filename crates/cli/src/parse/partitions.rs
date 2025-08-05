@@ -8,7 +8,7 @@ use cryo_freeze::{
     AddressChunk, CallDataChunk, Datatype, Dim, ParseError, Partition, PartitionLabels, SlotChunk,
     Source, Table, TimeDimension, TopicChunk, TransactionChunk,
 };
-use rand::{seq::SliceRandom, thread_rng};
+use rand::{rng, seq::SliceRandom};
 use std::{collections::HashMap, str::FromStr, sync::Arc};
 
 type ChunkLabels = Vec<Option<String>>;
@@ -112,7 +112,7 @@ pub(crate) async fn parse_partitions(
         Some("normal") => {}
         Some("reverse") => partitions.reverse(),
         Some("random") => {
-            let mut rng = thread_rng();
+            let mut rng = rng();
             partitions.shuffle(&mut rng);
         }
         _ => {
