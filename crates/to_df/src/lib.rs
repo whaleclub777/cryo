@@ -38,15 +38,15 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
         .filter(|(name, _)| name != "chain_id")
         .map(|(name, ty)| {
             let macro_name = match quote!(#ty).to_string().as_str() {
-                "Vec < Vec < u8 > >" => syn::Ident::new("with_series_binary", Span::call_site()),
+                "Vec < Vec < u8 > >" => syn::Ident::new("with_column_binary", Span::call_site()),
                 "Vec < Option < Vec < u8 > > >" => {
-                    syn::Ident::new("with_series_binary", Span::call_site())
+                    syn::Ident::new("with_column_binary", Span::call_site())
                 }
-                "Vec < U256 >" => syn::Ident::new("with_series_u256", Span::call_site()),
+                "Vec < U256 >" => syn::Ident::new("with_column_u256", Span::call_site()),
                 "Vec < Option < U256 > >" => {
-                    syn::Ident::new("with_series_option_u256", Span::call_site())
+                    syn::Ident::new("with_column_option_u256", Span::call_site())
                 }
-                _ => syn::Ident::new("with_series", Span::call_site()),
+                _ => syn::Ident::new("with_column", Span::call_site()),
             };
             let field_name_str = format!("{}", quote!(#name));
             quote! {
@@ -75,7 +75,7 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 ) {
                     for u256_type in u256_types.iter() {
                         let full_name = name.to_string() + u256_type.suffix().as_str();
-                        let full_name = PlSmallStr::from_string(name);
+                        let full_name = PlSmallStr::from_string(full_name);
 
                         match u256_type {
                             U256Type::Binary => {
@@ -235,9 +235,9 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 #(#field_processing)*
 
                 if self.chain_id.len() == 0 {
-                    with_series!(cols, "chain_id", vec![chain_id; self.n_rows as usize], schema);
+                    with_column!(cols, "chain_id", vec![chain_id; self.n_rows as usize], schema);
                 } else {
-                    with_series!(cols, "chain_id", self.chain_id, schema);
+                    with_column!(cols, "chain_id", self.chain_id, schema);
                 }
 
                 #event_code
