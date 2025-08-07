@@ -19,7 +19,7 @@ cryo_cli = { workspace = true }
 cryo_freeze = { workspace = true }
 polars = { workspace = true }
 pyo3 = { workspace = true }
-pyo3-asyncio = { workspace = true }
+pyo3-async-runtimes = { workspace = true }
 pyo3-polars = { workspace = true }
 tokio = { workspace = true }
 
