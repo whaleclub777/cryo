@@ -1,6 +1,6 @@
 use polars::prelude::*;
-use pyo3::{exceptions::PyTypeError, prelude::*};
 use polars_python::PyDataFrame;
+use pyo3::{exceptions::PyTypeError, prelude::*};
 
 use cryo_cli::{parse_args, Args};
 use cryo_freeze::collect;
@@ -127,7 +127,7 @@ pub fn _collect(
     verbose: bool,
     no_verbose: bool,
     event_signature: Option<String>,
-) -> PyResult<Bound<PyAny>> {
+) -> PyResult<Bound<'_, PyAny>> {
     if let Some(command) = command {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run_execute(command).await {

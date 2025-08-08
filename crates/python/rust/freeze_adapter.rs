@@ -124,7 +124,7 @@ pub fn _freeze(
     verbose: bool,
     no_verbose: bool,
     event_signature: Option<String>,
-) -> PyResult<Bound<PyAny>> {
+) -> PyResult<Bound<'_, PyAny>> {
     if let Some(command) = command {
         freeze_command(py, command)
     } else if let Some(datatype) = datatype {
@@ -216,7 +216,7 @@ pub fn _freeze(
     }
 }
 
-fn freeze_command(py: Python<'_>, command: String) -> PyResult<Bound<PyAny>> {
+fn freeze_command(py: Python<'_>, command: String) -> PyResult<Bound<'_, PyAny>> {
     pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let args = cryo_cli::parse_str(command.as_str()).await.expect("could not parse inputs");
         match run(args).await {
