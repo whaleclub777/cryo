@@ -1,6 +1,6 @@
 use polars::prelude::*;
 use pyo3::{exceptions::PyTypeError, prelude::*};
-use pyo3_polars::PyDataFrame;
+use polars_python::PyDataFrame;
 
 use cryo_cli::{parse_args, Args};
 use cryo_freeze::collect;
@@ -131,7 +131,7 @@ pub fn _collect(
     if let Some(command) = command {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run_execute(command).await {
-                Ok(df) => Ok(PyDataFrame(df)),
+                Ok(df) => Ok(PyDataFrame { df }),
                 Err(_e) => Err(PyErr::new::<PyTypeError, _>("failed")),
             }
         })
@@ -197,7 +197,7 @@ pub fn _collect(
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run_collect(args).await {
                 // Ok(df) => Ok(Python::with_gil(|py| py.None())),
-                Ok(df) => Ok(PyDataFrame(df)),
+                Ok(df) => Ok(PyDataFrame { df }),
                 Err(_e) => Err(PyErr::new::<PyTypeError, _>("failed")),
             }
         })
