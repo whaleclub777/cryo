@@ -127,9 +127,9 @@ pub fn _collect(
     verbose: bool,
     no_verbose: bool,
     event_signature: Option<String>,
-) -> PyResult<&PyAny> {
+) -> PyResult<Bound<PyAny>> {
     if let Some(command) = command {
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run_execute(command).await {
                 Ok(df) => Ok(PyDataFrame(df)),
                 Err(_e) => Err(PyErr::new::<PyTypeError, _>("failed")),
@@ -194,7 +194,7 @@ pub fn _collect(
             no_verbose,
             event_signature,
         };
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run_collect(args).await {
                 // Ok(df) => Ok(Python::with_gil(|py| py.None())),
                 Ok(df) => Ok(PyDataFrame(df)),
