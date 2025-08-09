@@ -11,20 +11,10 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as ItemStruct);
 
     // parse input args
-    let attrs = parse_macro_input!(attrs as syn::AttributeArgs);
-    let datatypes: Vec<_> = attrs
-        .into_iter()
-        .map(|arg| {
-            if let syn::NestedMeta::Meta(syn::Meta::Path(path)) = arg {
-                path
-            } else {
-                panic!("Expected Meta::Path");
-            }
-        })
-        .collect();
-    if datatypes.is_empty() {
-        panic!("At least one datatype must be specified");
-    }
+    let attrs = parse_macro_input!(attrs as syn::Meta);
+    let syn::Meta::Path(datatype) = attrs else {
+        panic!("Expected Meta::Path");
+    };
 
     let name = &input.ident;
 
@@ -200,7 +190,7 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let datatype_str =
-        datatypes[0].segments.iter().map(|seg| seg.ident.to_string()).collect::<Vec<_>>();
+        datatype.segments.iter().map(|seg| seg.ident.to_string()).collect::<Vec<_>>();
     let datatype_str = datatype_str.iter().last().unwrap();
 
     let mut column_types = Vec::new();
@@ -223,12 +213,7 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 schemas: &std::collections::HashMap<Datatype, Table>,
                 chain_id: u64,
             ) -> R<std::collections::HashMap<Datatype, DataFrame>> {
-                let datatypes = vec![#(#datatypes),*];
-                let datatype = if datatypes.len() == 1 {
-                    datatypes[0]
-                } else {
-                    panic!("improper datatypes for single schema")
-                };
+                let datatype = #datatype;
                 let schema = schemas.get(&datatype).expect("schema not provided");
                 let mut cols = Vec::with_capacity(schema.columns().len());
 
