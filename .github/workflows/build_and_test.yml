@@ -26,8 +26,7 @@ jobs:
       - name: Build
         run: cargo build --workspace
       - name: Run tests
-        run: cargo test --workspace
-
+        run: cargo test --workspace -j1
   clippy:
     runs-on: ubuntu-latest
     timeout-minutes: 30

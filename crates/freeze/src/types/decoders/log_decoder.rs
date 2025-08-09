@@ -85,7 +85,7 @@ impl LogDecoder {
         chunk_len: usize,
         u256_types: &[U256Type],
         column_encoding: &ColumnEncoding,
-    ) -> Result<Vec<Series>, CollectError> {
+    ) -> Result<Vec<Column>, CollectError> {
         // This is a smooth brain way of doing this, but I can't think of a better way right now
         let mut ints: Vec<i64> = vec![];
         let mut uints: Vec<u64> = vec![];
@@ -139,7 +139,7 @@ impl LogDecoder {
         // length as the input data and map to a series
         let name = format!("event__{name}");
         if !ints.is_empty() {
-            Ok(vec![Series::new(name.as_str(), ints)])
+            Ok(vec![Column::new(name.into(), ints)])
         } else if !i256s.is_empty() {
             let mut series_vec = Vec::new();
             for u256_type in u256_types.iter() {
@@ -151,7 +151,7 @@ impl LogDecoder {
             }
             Ok(series_vec)
         } else if !u256s.is_empty() {
-            let mut series_vec: Vec<Series> = Vec::new();
+            let mut series_vec = Vec::new();
             for u256_type in u256_types.iter() {
                 series_vec.push(u256s.to_u256_series(
                     name.clone(),
@@ -161,30 +161,30 @@ impl LogDecoder {
             }
             Ok(series_vec)
         } else if !uints.is_empty() {
-            Ok(vec![Series::new(name.as_str(), uints)])
+            Ok(vec![Column::new(name.into(), uints)])
         } else if !bytes.is_empty() {
             if bytes.len() != chunk_len {
                 return Err(err(mixed_length_err))
             }
-            Ok(vec![Series::new(name.as_str(), bytes)])
+            Ok(vec![Column::new(name.into(), bytes)])
         } else if !hexes.is_empty() {
             if hexes.len() != chunk_len {
                 return Err(err(mixed_length_err))
             }
-            Ok(vec![Series::new(name.as_str(), hexes)])
+            Ok(vec![Column::new(name.into(), hexes)])
         } else if !bools.is_empty() {
             if bools.len() != chunk_len {
                 return Err(err(mixed_length_err))
             }
-            Ok(vec![Series::new(name.as_str(), bools)])
+            Ok(vec![Column::new(name.into(), bools)])
         } else if !strings.is_empty() {
             if strings.len() != chunk_len {
                 return Err(err(mixed_length_err))
             }
-            Ok(vec![Series::new(name.as_str(), strings)])
+            Ok(vec![Column::new(name.into(), strings)])
         } else {
             // case where no data was passed
-            Ok(vec![Series::new(name.as_str(), vec![None::<u64>; chunk_len])])
+            Ok(vec![Column::new(name.into(), vec![None::<u64>; chunk_len])])
         }
     }
 }

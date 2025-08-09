@@ -38,15 +38,15 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
         .filter(|(name, _)| name != "chain_id")
         .map(|(name, ty)| {
             let macro_name = match quote!(#ty).to_string().as_str() {
-                "Vec < Vec < u8 > >" => syn::Ident::new("with_series_binary", Span::call_site()),
+                "Vec < Vec < u8 > >" => syn::Ident::new("with_column_binary", Span::call_site()),
                 "Vec < Option < Vec < u8 > > >" => {
-                    syn::Ident::new("with_series_binary", Span::call_site())
+                    syn::Ident::new("with_column_binary", Span::call_site())
                 }
-                "Vec < U256 >" => syn::Ident::new("with_series_u256", Span::call_site()),
+                "Vec < U256 >" => syn::Ident::new("with_column_u256", Span::call_site()),
                 "Vec < Option < U256 > >" => {
-                    syn::Ident::new("with_series_option_u256", Span::call_site())
+                    syn::Ident::new("with_column_option_u256", Span::call_site())
                 }
-                _ => syn::Ident::new("with_series", Span::call_site()),
+                _ => syn::Ident::new("with_column", Span::call_site()),
             };
             let field_name_str = format!("{}", quote!(#name));
             quote! {
@@ -68,32 +68,32 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
             if let Some(decoder) = decoder {
 
                 fn create_empty_u256_columns(
-                    cols: &mut Vec<Series>,
+                    cols: &mut Vec<Column>,
                     name: &str,
                     u256_types: &[U256Type],
                     column_encoding: &ColumnEncoding
                 ) {
                     for u256_type in u256_types.iter() {
                         let full_name = name.to_string() + u256_type.suffix().as_str();
-                        let full_name = full_name.as_str();
+                        let full_name = PlSmallStr::from_string(full_name);
 
                         match u256_type {
                             U256Type::Binary => {
                                 match column_encoding {
                                     ColumnEncoding::Binary => {
-                                        cols.push(Series::new(full_name, Vec::<Vec<u8>>::new()))
+                                        cols.push(Column::new(full_name, Vec::<Vec<u8>>::new()))
                                     },
                                     ColumnEncoding::Hex => {
-                                        cols.push(Series::new(full_name, Vec::<String>::new()))
+                                        cols.push(Column::new(full_name, Vec::<String>::new()))
                                     },
                                 }
                             },
-                            U256Type::String => cols.push(Series::new(full_name, Vec::<String>::new())),
-                            U256Type::F32 => cols.push(Series::new(full_name, Vec::<f32>::new())),
-                            U256Type::F64 => cols.push(Series::new(full_name, Vec::<f64>::new())),
-                            U256Type::U32 => cols.push(Series::new(full_name, Vec::<u32>::new())),
-                            U256Type::U64 => cols.push(Series::new(full_name, Vec::<u64>::new())),
-                            U256Type::Decimal128 => cols.push(Series::new(full_name, Vec::<Vec<u8>>::new())),
+                            U256Type::String => cols.push(Column::new(full_name, Vec::<String>::new())),
+                            U256Type::F32 => cols.push(Column::new(full_name, Vec::<f32>::new())),
+                            U256Type::F64 => cols.push(Column::new(full_name, Vec::<f64>::new())),
+                            U256Type::U32 => cols.push(Column::new(full_name, Vec::<u32>::new())),
+                            U256Type::U64 => cols.push(Column::new(full_name, Vec::<u64>::new())),
+                            U256Type::Decimal128 => cols.push(Column::new(full_name, Vec::<Vec<u8>>::new())),
                         }
                     }
                 }
@@ -103,37 +103,37 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 if self.event_cols.is_empty() {
                     for param in decoder.event.inputs.iter() {
                         let name = "event__".to_string() + param.name.as_str();
-                        let name = name.as_str();
+                        let name = PlSmallStr::from_string(name);
                         let ty = DynSolType::parse(&param.ty).unwrap();
                         match ty {
                             DynSolType::Address => {
                                 match schema.binary_type {
-                                    ColumnEncoding::Binary => cols.push(Series::new(name, Vec::<Vec<u8>>::new())),
-                                    ColumnEncoding::Hex => cols.push(Series::new(name, Vec::<String>::new())),
+                                    ColumnEncoding::Binary => cols.push(Column::new(name, Vec::<Vec<u8>>::new())),
+                                    ColumnEncoding::Hex => cols.push(Column::new(name, Vec::<String>::new())),
                                 }
                             },
                             DynSolType::Bytes => {
                                 match schema.binary_type {
-                                    ColumnEncoding::Binary => cols.push(Series::new(name, Vec::<Vec<u8>>::new())),
-                                    ColumnEncoding::Hex => cols.push(Series::new(name, Vec::<String>::new())),
+                                    ColumnEncoding::Binary => cols.push(Column::new(name, Vec::<Vec<u8>>::new())),
+                                    ColumnEncoding::Hex => cols.push(Column::new(name, Vec::<String>::new())),
                                 }
                             },
                             DynSolType::Int(bits) => {
                                 if bits <= 64 {
-                                    cols.push(Series::new(name, Vec::<i64>::new()))
+                                    cols.push(Column::new(name, Vec::<i64>::new()))
                                 } else {
-                                    create_empty_u256_columns(&mut cols, name, &u256_types, &schema.binary_type)
+                                    create_empty_u256_columns(&mut cols, &name, &u256_types, &schema.binary_type)
                                 }
                             },
                             DynSolType::Uint(bits) => {
                                 if bits <= 64 {
-                                    cols.push(Series::new(name, Vec::<u64>::new()))
+                                    cols.push(Column::new(name, Vec::<u64>::new()))
                                 } else {
-                                    create_empty_u256_columns(&mut cols, name, &u256_types, &schema.binary_type)
+                                    create_empty_u256_columns(&mut cols, &name, &u256_types, &schema.binary_type)
                                 }
                             },
-                            DynSolType::Bool => cols.push(Series::new(name, Vec::<bool>::new())),
-                            DynSolType::String => cols.push(Series::new(name, Vec::<String>::new())),
+                            DynSolType::Bool => cols.push(Column::new(name, Vec::<bool>::new())),
+                            DynSolType::String => cols.push(Column::new(name, Vec::<String>::new())),
                             DynSolType::Array(_) => return Err(err("could not generate Array column")),
                             DynSolType::FixedBytes(_) => return Err(err("could not generate FixedBytes column")),
                             DynSolType::FixedArray(_, _) => return Err(err("could not generate FixedArray column")),
@@ -235,9 +235,9 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
                 #(#field_processing)*
 
                 if self.chain_id.len() == 0 {
-                    with_series!(cols, "chain_id", vec![chain_id; self.n_rows as usize], schema);
+                    with_column!(cols, "chain_id", vec![chain_id; self.n_rows as usize], schema);
                 } else {
-                    with_series!(cols, "chain_id", self.chain_id, schema);
+                    with_column!(cols, "chain_id", self.chain_id, schema);
                 }
 
                 #event_code

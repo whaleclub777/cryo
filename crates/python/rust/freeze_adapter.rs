@@ -124,7 +124,7 @@ pub fn _freeze(
     verbose: bool,
     no_verbose: bool,
     event_signature: Option<String>,
-) -> PyResult<&PyAny> {
+) -> PyResult<Bound<'_, PyAny>> {
     if let Some(command) = command {
         freeze_command(py, command)
     } else if let Some(datatype) = datatype {
@@ -187,7 +187,7 @@ pub fn _freeze(
             event_signature,
         };
 
-        pyo3_asyncio::tokio::future_into_py(py, async move {
+        pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run(args).await {
                 Ok(Some(result)) => Python::with_gil(|py| {
                     // let paths = PyDict::new(py);
@@ -199,13 +199,13 @@ pub fn _freeze(
                     // let paths = paths.to_object(py);
 
                     let dict = [
-                        ("n_completed".to_string(), result.completed.len().into_py(py)),
-                        ("n_skipped".to_string(), result.skipped.len().into_py(py)),
-                        ("n_errored".to_string(), result.errored.len().into_py(py)),
+                        ("n_completed".to_string(), result.completed.len()),
+                        ("n_skipped".to_string(), result.skipped.len()),
+                        ("n_errored".to_string(), result.errored.len()),
                         // ("paths".to_string(), paths),
                     ]
-                    .into_py_dict(py);
-                    Ok(dict.to_object(py))
+                    .into_py_dict(py)?;
+                    Ok(dict.unbind().into_any())
                 }),
                 Ok(None) => Ok(Python::with_gil(|py| py.None())),
                 _ => Err(PyErr::new::<PyTypeError, _>("failed")),
@@ -216,8 +216,8 @@ pub fn _freeze(
     }
 }
 
-fn freeze_command(py: Python<'_>, command: String) -> PyResult<&PyAny> {
-    pyo3_asyncio::tokio::future_into_py(py, async move {
+fn freeze_command(py: Python<'_>, command: String) -> PyResult<Bound<'_, PyAny>> {
+    pyo3_async_runtimes::tokio::future_into_py(py, async move {
         let args = cryo_cli::parse_str(command.as_str()).await.expect("could not parse inputs");
         match run(args).await {
             Ok(Some(result)) => Python::with_gil(|py| {
@@ -230,13 +230,13 @@ fn freeze_command(py: Python<'_>, command: String) -> PyResult<&PyAny> {
                 // let paths = paths.to_object(py);
 
                 let dict = [
-                    ("n_completed".to_string(), result.completed.len().into_py(py)),
-                    ("n_skipped".to_string(), result.skipped.len().into_py(py)),
-                    ("n_errored".to_string(), result.errored.len().into_py(py)),
+                    ("n_completed".to_string(), result.completed.len()),
+                    ("n_skipped".to_string(), result.skipped.len()),
+                    ("n_errored".to_string(), result.errored.len()),
                     // ("paths".to_string(), paths),
                 ]
-                .into_py_dict(py);
-                Ok(dict.to_object(py))
+                .into_py_dict(py)?;
+                Ok(dict.unbind().into_any())
             }),
             Ok(None) => Ok(Python::with_gil(|py| py.None())),
             _ => Err(PyErr::new::<PyTypeError, _>("failed")),
