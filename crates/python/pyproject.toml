@@ -4,14 +4,19 @@ build-backend = "maturin"
 
 [project]
 name = "cryo"
+version = "1"
 description = "cryo is the easiest way to extract blockchain data to parquet, csv, json, or a python dataframe."
-requires-python = ">=3.7"
+requires-python = ">=3.9, <=3.12"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 readme = "README.md"
+dependencies = [
+    "polars>=0.18.4",
+    "web3>=7.13.0",
+]
 
 
 [tool.maturin]
@@ -25,3 +30,13 @@ strict = true
 files = ["python/cryo"]
 enable_incomplete_feature = "Unpack"
 
+[tool.uv]
+# Rebuild package when any rust files change
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "rust/Cargo.toml" },
+    { file = "**/*.rs" },
+]
+# Uncomment to build rust code in development mode
+config-settings = { build-args = '--profile=dev' }
+dev-dependencies = ["pytest>=7.4.4"]
