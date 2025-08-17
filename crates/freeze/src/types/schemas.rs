@@ -2,7 +2,9 @@
 use std::collections::HashMap;
 
 use crate::{err, CollectError, ColumnEncoding, Datatype, LogDecoder};
+use alloy::dyn_abi::DynSolType;
 use indexmap::{IndexMap, IndexSet};
+use polars::prelude::Column;
 use thiserror::Error;
 
 /// collection of schemas
@@ -79,9 +81,12 @@ pub enum U256Type {
 
 impl U256Type {
     /// convert U256Type to Columntype
-    pub fn to_columntype(&self) -> ColumnType {
+    pub fn to_columntype(&self, column_encoding: &ColumnEncoding) -> ColumnType {
         match self {
-            U256Type::Binary => ColumnType::Binary,
+            U256Type::Binary => match column_encoding {
+                ColumnEncoding::Binary => ColumnType::Binary,
+                ColumnEncoding::Hex => ColumnType::Hex,
+            }
             U256Type::String => ColumnType::String,
             U256Type::F32 => ColumnType::Float32,
             U256Type::F64 => ColumnType::Float64,
@@ -152,6 +157,76 @@ impl ColumnType {
             ColumnType::Hex => "hex",
         }
     }
+
+    /// Convert [`DynSolType`] to [`ColumnType`]
+    pub fn from_sol_type(sol_type: &DynSolType, binary_type: &ColumnEncoding) -> Result<Self, SchemaError> {
+        // let name = "event__".to_string() + param.name.as_str();
+        // let name = PlSmallStr::from_string(name);
+        let result = match sol_type {
+            DynSolType::Address => {
+                match binary_type {
+                    ColumnEncoding::Binary => ColumnType::Binary,
+                    ColumnEncoding::Hex => ColumnType::Hex,
+                }
+            },
+            DynSolType::Bytes => {
+                match binary_type {
+                    ColumnEncoding::Binary => ColumnType::Binary,
+                    ColumnEncoding::Hex => ColumnType::Hex,
+                }
+            },
+            DynSolType::Int(bits) => {
+                if *bits <= 64 {
+                    ColumnType::Int64
+                } else {
+                    ColumnType::UInt256
+                }
+            },
+            DynSolType::Uint(bits) => {
+                if *bits <= 64 {
+                    ColumnType::UInt64
+                } else {
+                    ColumnType::UInt256
+                }
+            },
+            DynSolType::Bool => ColumnType::Boolean,
+            DynSolType::String => ColumnType::String,
+            DynSolType::Array(_) => return Err(SchemaError::InvalidSolType("Array")),
+            DynSolType::FixedBytes(_) => return Err(SchemaError::InvalidSolType("FixedBytes")),
+            DynSolType::FixedArray(_, _) => return Err(SchemaError::InvalidSolType("FixedArray")),
+            DynSolType::Tuple(_) => return Err(SchemaError::InvalidSolType("Tuple")),
+            DynSolType::Function => return Err(SchemaError::InvalidSolType("Function")),
+            // _ => return Err(SchemaError::InvalidSolType("Unknown")),
+        };
+        Ok(result)
+    }
+
+    /// Create empty columns for U256 types
+    pub fn create_empty_u256_columns(name: &str, u256_types: &[U256Type], column_encoding: &ColumnEncoding) -> Vec<Column> {
+        u256_types.iter().map(|u256_type| {
+            let col_type = u256_type.to_columntype(column_encoding);
+            let full_name = name.to_string() + u256_type.suffix().as_str();
+            col_type.create_empty_column(&full_name)
+        }).collect()
+    }
+
+    /// Create an empty column of the specified type
+    pub fn create_empty_column(self, name: &str) -> Column {
+        match self {
+            ColumnType::Boolean => Column::new(name.into(), Vec::<bool>::new()),
+            ColumnType::UInt32 => Column::new(name.into(), Vec::<u32>::new()),
+            ColumnType::UInt64 => Column::new(name.into(), Vec::<u64>::new()),
+            ColumnType::UInt256 => Column::new(name.into(), Vec::<Vec<u8>>::new()),
+            ColumnType::Int32 => Column::new(name.into(), Vec::<i32>::new()),
+            ColumnType::Int64 => Column::new(name.into(), Vec::<i64>::new()),
+            ColumnType::Float32 => Column::new(name.into(), Vec::<f32>::new()),
+            ColumnType::Float64 => Column::new(name.into(), Vec::<f64>::new()),
+            ColumnType::Decimal128 => Column::new(name.into(), Vec::<Vec<u8>>::new()),
+            ColumnType::String => Column::new(name.into(), Vec::<String>::new()),
+            ColumnType::Binary => Column::new(name.into(), Vec::<Vec<u8>>::new()),
+            ColumnType::Hex => Column::new(name.into(), Vec::<String>::new()),
+        }
+    }
 }
 
 /// Error related to Schemas
@@ -160,6 +235,9 @@ pub enum SchemaError {
     /// Invalid column being operated on
     #[error("Invalid column")]
     InvalidColumn,
+    /// Error converting column type
+    #[error("Invalid column type, {0}")]
+    InvalidSolType(&'static str),
 }
 
 impl Datatype {
@@ -176,8 +254,16 @@ impl Datatype {
         log_decoder: Option<LogDecoder>,
     ) -> Result<Table, SchemaError> {
         let column_types = self.column_types();
-        let all_columns = column_types.keys().map(|k| k.to_string()).collect();
-        let default_columns = self.default_columns();
+        let mut additional_column_types = IndexMap::new();
+        let mut all_columns: IndexSet<_> = column_types.keys().map(|k| k.to_string()).collect();
+        let mut default_columns: Vec<_> = self.default_columns().iter().map(|s| s.to_string()).collect();
+        if let Some(log_decoder) = &log_decoder {
+            default_columns.extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
+            all_columns.extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
+            let drop_names = vec!["topic1".to_string(), "topic2".to_string(), "topic3".to_string(), "data".to_string()];
+            all_columns.retain(|i| !drop_names.contains(i));
+            additional_column_types.extend(log_decoder.field_names_and_types().into_iter().map(|(name, ty)| (format!("event__{name}"), ty)));
+        }
         let used_columns = compute_used_columns(
             all_columns,
             default_columns,
@@ -187,11 +273,18 @@ impl Datatype {
         );
         let mut columns = IndexMap::new();
         for column in used_columns {
-            let mut ctype = column_types.get(column.as_str()).ok_or(SchemaError::InvalidColumn)?;
-            if (*binary_column_format == ColumnEncoding::Hex) & (ctype == &ColumnType::Binary) {
-                ctype = &ColumnType::Hex;
+            let mut ctype = match column_types.get(column.as_str()) {
+                Some(ctype) => *ctype,
+                None => {
+                    let sol_type = additional_column_types.get(column.as_str())
+                        .ok_or(SchemaError::InvalidColumn)?;
+                    ColumnType::from_sol_type(sol_type, &binary_column_format)?
+                }
+            };
+            if (*binary_column_format == ColumnEncoding::Hex) & (ctype == ColumnType::Binary) {
+                ctype = ColumnType::Hex;
             }
-            columns.insert((*column.clone()).to_string(), *ctype);
+            columns.insert((*column.clone()).to_string(), ctype);
         }
 
         let schema = Table {
@@ -208,7 +301,7 @@ impl Datatype {
 
 fn compute_used_columns(
     all_columns: IndexSet<String>,
-    default_columns: Vec<&str>,
+    default_columns: Vec<String>,
     include_columns: &Option<Vec<String>>,
     exclude_columns: &Option<Vec<String>>,
     columns: &Option<Vec<String>>,
@@ -222,13 +315,15 @@ fn compute_used_columns(
     let mut result_set = IndexSet::from_iter(default_columns.iter().map(|s| s.to_string()));
     if let Some(include) = include_columns {
         if (include.len() == 1) & include.contains(&"all".to_string()) {
-            return all_columns
+            result_set.clear();
+            result_set.extend(all_columns.iter().cloned());
+        } else {
+            // Permissively skip `include` columns that are not in this dataset (they might apply to
+            // other dataset)
+            result_set.extend(include.iter().cloned());
         }
-        // Permissively skip `include` columns that are not in this dataset (they might apply to
-        // other dataset)
-        result_set.extend(include.iter().cloned());
-        result_set = result_set.intersection(&all_columns).cloned().collect()
     }
+    result_set = result_set.intersection(&all_columns).cloned().collect();
     if let Some(exclude) = exclude_columns {
         let exclude_set = IndexSet::<String>::from_iter(exclude.iter().cloned());
         result_set = result_set.difference(&exclude_set).cloned().collect()
