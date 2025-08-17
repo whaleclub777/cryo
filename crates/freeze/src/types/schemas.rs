@@ -86,7 +86,7 @@ impl U256Type {
             U256Type::Binary => match column_encoding {
                 ColumnEncoding::Binary => ColumnType::Binary,
                 ColumnEncoding::Hex => ColumnType::Hex,
-            }
+            },
             U256Type::String => ColumnType::String,
             U256Type::F32 => ColumnType::Float32,
             U256Type::F64 => ColumnType::Float64,
@@ -159,21 +159,20 @@ impl ColumnType {
     }
 
     /// Convert [`DynSolType`] to [`ColumnType`]
-    pub fn from_sol_type(sol_type: &DynSolType, binary_type: &ColumnEncoding) -> Result<Self, SchemaError> {
+    pub fn from_sol_type(
+        sol_type: &DynSolType,
+        binary_type: &ColumnEncoding,
+    ) -> Result<Self, SchemaError> {
         // let name = "event__".to_string() + param.name.as_str();
         // let name = PlSmallStr::from_string(name);
         let result = match sol_type {
-            DynSolType::Address => {
-                match binary_type {
-                    ColumnEncoding::Binary => ColumnType::Binary,
-                    ColumnEncoding::Hex => ColumnType::Hex,
-                }
+            DynSolType::Address => match binary_type {
+                ColumnEncoding::Binary => ColumnType::Binary,
+                ColumnEncoding::Hex => ColumnType::Hex,
             },
-            DynSolType::Bytes => {
-                match binary_type {
-                    ColumnEncoding::Binary => ColumnType::Binary,
-                    ColumnEncoding::Hex => ColumnType::Hex,
-                }
+            DynSolType::Bytes => match binary_type {
+                ColumnEncoding::Binary => ColumnType::Binary,
+                ColumnEncoding::Hex => ColumnType::Hex,
             },
             DynSolType::Int(bits) => {
                 if *bits <= 64 {
@@ -181,14 +180,14 @@ impl ColumnType {
                 } else {
                     ColumnType::UInt256
                 }
-            },
+            }
             DynSolType::Uint(bits) => {
                 if *bits <= 64 {
                     ColumnType::UInt64
                 } else {
                     ColumnType::UInt256
                 }
-            },
+            }
             DynSolType::Bool => ColumnType::Boolean,
             DynSolType::String => ColumnType::String,
             DynSolType::Array(_) => return Err(SchemaError::InvalidSolType("Array")),
@@ -202,12 +201,19 @@ impl ColumnType {
     }
 
     /// Create empty columns for U256 types
-    pub fn create_empty_u256_columns(name: &str, u256_types: &[U256Type], column_encoding: &ColumnEncoding) -> Vec<Column> {
-        u256_types.iter().map(|u256_type| {
-            let col_type = u256_type.to_columntype(column_encoding);
-            let full_name = name.to_string() + u256_type.suffix().as_str();
-            col_type.create_empty_column(&full_name)
-        }).collect()
+    pub fn create_empty_u256_columns(
+        name: &str,
+        u256_types: &[U256Type],
+        column_encoding: &ColumnEncoding,
+    ) -> Vec<Column> {
+        u256_types
+            .iter()
+            .map(|u256_type| {
+                let col_type = u256_type.to_columntype(column_encoding);
+                let full_name = name.to_string() + u256_type.suffix().as_str();
+                col_type.create_empty_column(&full_name)
+            })
+            .collect()
     }
 
     /// Create an empty column of the specified type
@@ -256,13 +262,26 @@ impl Datatype {
         let column_types = self.column_types();
         let mut additional_column_types = IndexMap::new();
         let mut all_columns: IndexSet<_> = column_types.keys().map(|k| k.to_string()).collect();
-        let mut default_columns: Vec<_> = self.default_columns().iter().map(|s| s.to_string()).collect();
+        let mut default_columns: Vec<_> =
+            self.default_columns().iter().map(|s| s.to_string()).collect();
         if let Some(log_decoder) = &log_decoder {
-            default_columns.extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
-            all_columns.extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
-            let drop_names = vec!["topic1".to_string(), "topic2".to_string(), "topic3".to_string(), "data".to_string()];
+            default_columns
+                .extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
+            all_columns
+                .extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
+            let drop_names = [
+                "topic1".to_string(),
+                "topic2".to_string(),
+                "topic3".to_string(),
+                "data".to_string(),
+            ];
             all_columns.retain(|i| !drop_names.contains(i));
-            additional_column_types.extend(log_decoder.field_names_and_types().into_iter().map(|(name, ty)| (format!("event__{name}"), ty)));
+            additional_column_types.extend(
+                log_decoder
+                    .field_names_and_types()
+                    .into_iter()
+                    .map(|(name, ty)| (format!("event__{name}"), ty)),
+            );
         }
         let used_columns = compute_used_columns(
             all_columns,
@@ -276,9 +295,10 @@ impl Datatype {
             let mut ctype = match column_types.get(column.as_str()) {
                 Some(ctype) => *ctype,
                 None => {
-                    let sol_type = additional_column_types.get(column.as_str())
+                    let sol_type = additional_column_types
+                        .get(column.as_str())
                         .ok_or(SchemaError::InvalidColumn)?;
-                    ColumnType::from_sol_type(sol_type, &binary_column_format)?
+                    ColumnType::from_sol_type(sol_type, binary_column_format)?
                 }
             };
             if (*binary_column_format == ColumnEncoding::Hex) & (ctype == ColumnType::Binary) {
