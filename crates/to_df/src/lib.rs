@@ -56,38 +56,6 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
             let decoder = schema.log_decoder.clone();
             let u256_types: Vec<_> = schema.u256_types.clone().into_iter().collect();
             if let Some(decoder) = decoder {
-
-                fn create_empty_u256_columns(
-                    cols: &mut Vec<Column>,
-                    name: &str,
-                    u256_types: &[U256Type],
-                    column_encoding: &ColumnEncoding
-                ) {
-                    for u256_type in u256_types.iter() {
-                        let full_name = name.to_string() + u256_type.suffix().as_str();
-                        let full_name = PlSmallStr::from_string(full_name);
-
-                        match u256_type {
-                            U256Type::Binary => {
-                                match column_encoding {
-                                    ColumnEncoding::Binary => {
-                                        cols.push(Column::new(full_name, Vec::<Vec<u8>>::new()))
-                                    },
-                                    ColumnEncoding::Hex => {
-                                        cols.push(Column::new(full_name, Vec::<String>::new()))
-                                    },
-                                }
-                            },
-                            U256Type::String => cols.push(Column::new(full_name, Vec::<String>::new())),
-                            U256Type::F32 => cols.push(Column::new(full_name, Vec::<f32>::new())),
-                            U256Type::F64 => cols.push(Column::new(full_name, Vec::<f64>::new())),
-                            U256Type::U32 => cols.push(Column::new(full_name, Vec::<u32>::new())),
-                            U256Type::U64 => cols.push(Column::new(full_name, Vec::<u64>::new())),
-                            U256Type::Decimal128 => cols.push(Column::new(full_name, Vec::<Vec<u8>>::new())),
-                        }
-                    }
-                }
-
                 // Write columns even if there are no values decoded - indicates empty dataframe
                 let chunk_len = self.n_rows;
                 if self.event_cols.is_empty() {
@@ -95,41 +63,14 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
                         let name = "event__".to_string() + param.name.as_str();
                         let name = PlSmallStr::from_string(name);
                         let ty = DynSolType::parse(&param.ty).unwrap();
-                        match ty {
-                            DynSolType::Address => {
-                                match schema.binary_type {
-                                    ColumnEncoding::Binary => cols.push(Column::new(name, Vec::<Vec<u8>>::new())),
-                                    ColumnEncoding::Hex => cols.push(Column::new(name, Vec::<String>::new())),
-                                }
+                        let coltype = ColumnType::from_sol_type(&ty, &schema.binary_type).unwrap();
+                        match coltype {
+                            ColumnType::UInt256 => {
+                                cols.extend(ColumnType::create_empty_u256_columns(&name, &u256_types, &schema.binary_type));
                             },
-                            DynSolType::Bytes => {
-                                match schema.binary_type {
-                                    ColumnEncoding::Binary => cols.push(Column::new(name, Vec::<Vec<u8>>::new())),
-                                    ColumnEncoding::Hex => cols.push(Column::new(name, Vec::<String>::new())),
-                                }
+                            _ => {
+                                cols.push(coltype.create_empty_column(&name));
                             },
-                            DynSolType::Int(bits) => {
-                                if bits <= 64 {
-                                    cols.push(Column::new(name, Vec::<i64>::new()))
-                                } else {
-                                    create_empty_u256_columns(&mut cols, &name, &u256_types, &schema.binary_type)
-                                }
-                            },
-                            DynSolType::Uint(bits) => {
-                                if bits <= 64 {
-                                    cols.push(Column::new(name, Vec::<u64>::new()))
-                                } else {
-                                    create_empty_u256_columns(&mut cols, &name, &u256_types, &schema.binary_type)
-                                }
-                            },
-                            DynSolType::Bool => cols.push(Column::new(name, Vec::<bool>::new())),
-                            DynSolType::String => cols.push(Column::new(name, Vec::<String>::new())),
-                            DynSolType::Array(_) => return Err(err("could not generate Array column")),
-                            DynSolType::FixedBytes(_) => return Err(err("could not generate FixedBytes column")),
-                            DynSolType::FixedArray(_, _) => return Err(err("could not generate FixedArray column")),
-                            DynSolType::Tuple(_) => return Err(err("could not generate Tuple column")),
-                            DynSolType::Function => return Err(err("could not generate Function column")),
-                            _ => (),
                         }
                     }
                 } else {
