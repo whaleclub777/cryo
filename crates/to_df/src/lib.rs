@@ -6,17 +6,14 @@ use quote::quote;
 use syn::{parse_macro_input, ItemStruct};
 
 /// implements ToDataFrames and ColumnData for struct
-#[proc_macro_attribute]
-pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
+#[proc_macro_derive(ToDataFrames, attributes(to_df))]
+pub fn to_data_frames(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as ItemStruct);
 
-    // parse input args
-    let attrs = parse_macro_input!(attrs as syn::Meta);
-    let syn::Meta::Path(datatype) = attrs else {
-        panic!("Expected Meta::Path");
-    };
-
     let name = &input.ident;
+
+    let datatype = quote!(Datatype::#name);
+    let datatype_str = name.to_string();
 
     let field_names_and_types: Vec<_> =
         input.clone().fields.into_iter().map(|f| (f.ident.unwrap(), f.ty)).collect();
@@ -130,10 +127,6 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
         }
     }
 
-    let datatype_str =
-        datatype.segments.iter().map(|seg| seg.ident.to_string()).collect::<Vec<_>>();
-    let datatype_str = datatype_str.iter().last().unwrap();
-
     let mut column_types = Vec::new();
     for (name, ty) in field_names_and_types.iter() {
         if let Some(column_type) = map_type_to_column_type(ty) {
@@ -145,8 +138,6 @@ pub fn to_df(attrs: TokenStream, input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        #input
-
         impl ToDataFrames for #name {
 
             fn create_dfs(

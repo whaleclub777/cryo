@@ -8,8 +8,7 @@ use alloy::{
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::Traces)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct Traces {
     n_rows: u64,
     action_from: Vec<Option<Vec<u8>>>,

@@ -6,8 +6,7 @@ use alloy::{
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::Blocks)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct Blocks {
     n_rows: u64,
     block_hash: Vec<Option<Vec<u8>>>,

@@ -9,8 +9,7 @@ use alloy::{
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::Transactions)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct Transactions {
     n_rows: u64,
     block_number: Vec<Option<u32>>,

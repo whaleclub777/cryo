@@ -4,8 +4,7 @@ use alloy::sol_types::SolCall;
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::Erc721Metadata)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct Erc721Metadata {
     n_rows: u64,
     block_number: Vec<u32>,

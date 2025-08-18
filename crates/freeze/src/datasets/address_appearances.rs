@@ -12,8 +12,7 @@ use polars::prelude::*;
 use std::collections::HashMap;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::AddressAppearances)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct AddressAppearances {
     n_rows: usize,
     block_number: Vec<u32>,
