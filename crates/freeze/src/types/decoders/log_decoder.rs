@@ -1,6 +1,6 @@
 use crate::{err, CollectError, ColumnEncoding, ToU256Series, U256Type};
 use alloy::{
-    dyn_abi::{DynSolValue, EventExt},
+    dyn_abi::{DynSolType, DynSolValue, EventExt},
     hex::ToHexExt,
     json_abi::Event,
     primitives::{I256, U256},
@@ -36,6 +36,20 @@ impl LogDecoder {
     /// get field names of event inputs
     pub fn field_names(&self) -> Vec<String> {
         self.event.inputs.iter().map(|i| i.name.clone()).collect()
+    }
+
+    /// get field types of event inputs
+    pub fn field_types(&self) -> Vec<DynSolType> {
+        self.event.inputs.iter().map(|i| DynSolType::parse(&i.ty).unwrap()).collect()
+    }
+
+    /// get field names and types of event inputs
+    pub fn field_names_and_types(&self) -> Vec<(String, DynSolType)> {
+        self.event
+            .inputs
+            .iter()
+            .map(|i| (i.name.clone(), DynSolType::parse(&i.ty).unwrap()))
+            .collect()
     }
 
     /// converts from a log type to an abi token type

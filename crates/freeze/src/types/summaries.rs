@@ -376,7 +376,7 @@ fn print_schema(name: &Datatype, schema: &Table) {
                 for uint256_type in schema.u256_types.iter() {
                     print_bullet(
                         column.to_owned() + uint256_type.suffix().as_str(),
-                        uint256_type.to_columntype().as_str(),
+                        uint256_type.to_columntype(&schema.binary_type).as_str(),
                     );
                 }
             } else {
