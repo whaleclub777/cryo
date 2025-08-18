@@ -163,8 +163,6 @@ impl ColumnType {
         sol_type: &DynSolType,
         binary_type: &ColumnEncoding,
     ) -> Result<Self, SchemaError> {
-        // let name = "event__".to_string() + param.name.as_str();
-        // let name = PlSmallStr::from_string(name);
         let result = match sol_type {
             DynSolType::Address => match binary_type {
                 ColumnEncoding::Binary => ColumnType::Binary,
@@ -491,5 +489,32 @@ mod tests {
         assert!(!table.columns().contains(&"extra_data"));
         assert_eq!(7, table.columns().len());
         assert_eq!(["chain_id", "receipts_root"], table.columns()[5..7]);
+    }
+
+    #[test]
+    fn test_table_schema_log_decoder() {
+        let table = Datatype::Logs
+            .table_schema(
+                &get_u256_types(),
+                &ColumnEncoding::Hex,
+                &None,
+                &None,
+                &None,
+                None,
+                Some(
+                    LogDecoder::new(
+                        "Transfer(address indexed from, address indexed to, uint256 value)"
+                            .to_string(),
+                    )
+                    .unwrap(),
+                ),
+            )
+            .unwrap();
+        assert!(!table.columns().contains(&"topic1"));
+        assert!(!table.columns().contains(&"topic2"));
+        assert!(!table.columns().contains(&"topic3"));
+        assert!(!table.columns().contains(&"data"));
+        assert_eq!(table.columns().len(), 11);
+        assert_eq!(["event__from", "event__to", "event__value"], table.columns()[8..11]);
     }
 }
