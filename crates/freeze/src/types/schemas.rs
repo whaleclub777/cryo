@@ -238,10 +238,13 @@ impl ColumnType {
 pub enum SchemaError {
     /// Invalid column being operated on
     #[error("Invalid column")]
-    InvalidColumn,
+    InvalidColumn(String),
     /// Error converting column type
     #[error("Invalid column type, {0}")]
     InvalidSolType(&'static str),
+    /// Conflict column names
+    #[error("Conflict column names: {0:?}")]
+    ConflictColumnNames(Vec<String>),
 }
 
 impl Datatype {
@@ -272,7 +275,7 @@ impl Datatype {
             let expected_len = all_columns.len() + event_names.len();
             all_columns.extend(event_names.clone());
             if all_columns.len() != expected_len {
-                eprintln!("Warning: duplicate event names in log decoder: {:?}", event_names);
+                return Err(SchemaError::ConflictColumnNames(event_names.clone()));
             }
             let drop_names = [
                 "topic1".to_string(),
@@ -302,7 +305,7 @@ impl Datatype {
                 None => {
                     let sol_type = additional_column_types
                         .get(column.as_str())
-                        .ok_or(SchemaError::InvalidColumn)?;
+                        .ok_or_else(|| SchemaError::InvalidColumn(column.clone()))?;
                     ColumnType::from_sol_type(sol_type, binary_column_format)?
                 }
             };
