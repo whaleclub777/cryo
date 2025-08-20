@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use crate::{err, CollectError, ColumnEncoding, Datatype, LogDecoder};
 use alloy::dyn_abi::DynSolType;
 use indexmap::{IndexMap, IndexSet};
-use polars::prelude::Column;
 use thiserror::Error;
 
 /// collection of schemas
@@ -217,42 +216,6 @@ impl ColumnType {
             // _ => return Err(SchemaError::InvalidSolType("Unknown")),
         };
         Ok(result)
-    }
-
-    /// Create empty columns for U256 types
-    pub fn create_empty_u256_columns(
-        name: &str,
-        col_type: ColumnType,
-        u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
-    ) -> Vec<Column> {
-        u256_types
-            .iter()
-            .map(|u256_type| {
-                let new_type = u256_type.to_columntype(column_encoding);
-                let full_name = name.to_string() + u256_type.suffix(col_type).as_str();
-                new_type.create_empty_column(&full_name)
-            })
-            .collect()
-    }
-
-    /// Create an empty column of the specified type
-    pub fn create_empty_column(self, name: &str) -> Column {
-        match self {
-            ColumnType::Boolean => Column::new(name.into(), Vec::<bool>::new()),
-            ColumnType::UInt32 => Column::new(name.into(), Vec::<u32>::new()),
-            ColumnType::UInt64 => Column::new(name.into(), Vec::<u64>::new()),
-            ColumnType::UInt256 => Column::new(format!("{name}_u256binary").into(), Vec::<Vec<u8>>::new()),
-            ColumnType::Int32 => Column::new(name.into(), Vec::<i32>::new()),
-            ColumnType::Int64 => Column::new(name.into(), Vec::<i64>::new()),
-            ColumnType::Int256 => Column::new(format!("{name}_i256binary").into(), Vec::<Vec<u8>>::new()),
-            ColumnType::Float32 => Column::new(name.into(), Vec::<f32>::new()),
-            ColumnType::Float64 => Column::new(name.into(), Vec::<f64>::new()),
-            ColumnType::Decimal128 => Column::new(name.into(), Vec::<Vec<u8>>::new()),
-            ColumnType::String => Column::new(name.into(), Vec::<String>::new()),
-            ColumnType::Binary => Column::new(name.into(), Vec::<Vec<u8>>::new()),
-            ColumnType::Hex => Column::new(name.into(), Vec::<String>::new()),
-        }
     }
 }
 

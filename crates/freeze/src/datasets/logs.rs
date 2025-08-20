@@ -197,16 +197,12 @@ fn extract_event_cols(
                 let name = format!("event__{name}");
                 let name = PlSmallStr::from_string(name);
                 match schema.column_type(&name) {
-                    Some(col_type) if col_type.is_256() => {
-                        cols.extend(ColumnType::create_empty_u256_columns(
+                    Some(col_type) => {
+                        cols.extend(col_type.create_empty_columns(
                             &name,
-                            col_type,
                             &u256_types,
                             &schema.binary_type,
                         ));
-                    }
-                    Some(coltype) => {
-                        cols.push(coltype.create_empty_column(&name));
                     }
                     _ => {}
                 }
@@ -218,7 +214,7 @@ fn extract_event_cols(
                     continue;
                 }
                 let series_vec =
-                    decoder.make_series(name, data, chunk_len, &u256_types, &schema.binary_type);
+                    ColumnType::create_column_from_values(name, data, chunk_len, &u256_types, &schema.binary_type);
                 match series_vec {
                     Ok(s) => {
                         cols.extend(s);

@@ -2,6 +2,7 @@ mod export;
 mod read;
 mod sort;
 mod u256s;
+mod columns;
 
 #[macro_use]
 mod creation;
