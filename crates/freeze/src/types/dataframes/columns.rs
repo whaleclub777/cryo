@@ -3,15 +3,32 @@ use polars::prelude::Column;
 
 use crate::{err, CollectError, ColumnEncoding, ColumnType, ToU256Series, U256Type};
 
-impl ColumnType {
-    /// data should never be mixed type, otherwise this will return inconsistent results
-    pub fn create_column_from_values(
-        name: String,
+/// A collection of dynamic values that can be used in a DataFrame column.
+pub enum DynValues {
+    /// int
+    Ints(Vec<i64>),
+    /// uint
+    UInts(Vec<u64>),
+    /// u256
+    U256s(Vec<U256>),
+    /// i256
+    I256s(Vec<I256>),
+    /// bytes
+    Bytes(Vec<Vec<u8>>),
+    /// hex
+    Hexes(Vec<String>),
+    /// bool
+    Bools(Vec<bool>),
+    /// string
+    Strings(Vec<String>),
+}
+
+impl DynValues {
+    /// Create a new `DynValues` instance from a vector of `DynSolValue`s.
+    pub fn from_sol_values(
         data: Vec<DynSolValue>,
-        chunk_len: usize,
-        u256_types: &[U256Type],
         column_encoding: &ColumnEncoding,
-    ) -> Result<Vec<Column>, CollectError> {
+    ) -> Self {
         // This is a smooth brain way of doing this, but I can't think of a better way right now
         let mut ints: Vec<i64> = vec![];
         let mut uints: Vec<u64> = vec![];
@@ -58,61 +75,114 @@ impl ColumnType {
                 DynSolValue::Function(_) => {}
             }
         }
-        let mixed_length_err = format!("could not parse column {name}, mixed type");
-        let mixed_length_err = mixed_length_err.as_str();
 
-        // check each vector, see if it contains any values, if it does, check if it's the same
-        // length as the input data and map to a series
         if !ints.is_empty() {
-            Ok(vec![Column::new(name.into(), ints)])
+            DynValues::Ints(ints)
         } else if !i256s.is_empty() {
-            let mut series_vec = Vec::new();
-            for u256_type in u256_types.iter() {
-                series_vec.push(i256s.to_u256_series(
-                    name.clone(),
-                    u256_type.clone(),
-                    column_encoding,
-                )?)
-            }
-            Ok(series_vec)
+            DynValues::I256s(i256s)
         } else if !u256s.is_empty() {
-            let mut series_vec = Vec::new();
-            for u256_type in u256_types.iter() {
-                series_vec.push(u256s.to_u256_series(
-                    name.clone(),
-                    u256_type.clone(),
-                    column_encoding,
-                )?)
-            }
-            Ok(series_vec)
+            DynValues::U256s(u256s)
         } else if !uints.is_empty() {
-            Ok(vec![Column::new(name.into(), uints)])
+            DynValues::UInts(uints)
         } else if !bytes.is_empty() {
-            if bytes.len() != chunk_len {
-                return Err(err(mixed_length_err))
-            }
-            Ok(vec![Column::new(name.into(), bytes)])
+            DynValues::Bytes(bytes)
         } else if !hexes.is_empty() {
-            if hexes.len() != chunk_len {
-                return Err(err(mixed_length_err))
-            }
-            Ok(vec![Column::new(name.into(), hexes)])
+            DynValues::Hexes(hexes)
         } else if !bools.is_empty() {
-            if bools.len() != chunk_len {
-                return Err(err(mixed_length_err))
-            }
-            Ok(vec![Column::new(name.into(), bools)])
+            DynValues::Bools(bools)
         } else if !strings.is_empty() {
-            if strings.len() != chunk_len {
-                return Err(err(mixed_length_err))
-            }
-            Ok(vec![Column::new(name.into(), strings)])
+            DynValues::Strings(strings)
         } else {
             // case where no data was passed
-            Ok(vec![Column::new(name.into(), vec![None::<u64>; chunk_len])])
+            DynValues::UInts(vec![])
         }
     }
 
+    /// Returns the length of the underlying data.
+    pub fn len(&self) -> usize {
+        match self {
+            DynValues::Ints(ints) => ints.len(),
+            DynValues::I256s(i256s) => i256s.len(),
+            DynValues::U256s(u256s) => u256s.len(),
+            DynValues::UInts(uints) => uints.len(),
+            DynValues::Bytes(bytes) => bytes.len(),
+            DynValues::Hexes(hexes) => hexes.len(),
+            DynValues::Bools(bools) => bools.len(),
+            DynValues::Strings(strings) => strings.len(),
+        }
+    }
+
+    /// Converts the `DynValues` into `Vec<Column>`.
+    pub fn into_columns(
+        self,
+        name: String,
+        chunk_len: usize,
+        u256_types: &[U256Type],
+        column_encoding: &ColumnEncoding,
+    ) -> Result<Vec<Column>, CollectError> {
+        let mixed_length_err = format!("could not parse column {name}, mixed type");
+        let mixed_length_err = mixed_length_err.as_str();
+
+        if self.len() != chunk_len {
+            return Err(err(mixed_length_err))
+        }
+        match self {
+            Self::Ints(ints) => {
+                Ok(vec![Column::new(name.into(), ints)])
+            }
+            Self::UInts(uints) => {
+                Ok(vec![Column::new(name.into(), uints)])
+            }
+            Self::I256s(i256s) => {
+                let mut series_vec = Vec::new();
+                for u256_type in u256_types.iter() {
+                    series_vec.push(i256s.to_u256_series(
+                        name.clone(),
+                        u256_type.clone(),
+                        column_encoding,
+                    )?)
+                }
+                Ok(series_vec)
+            }
+            Self::U256s(u256s) => {
+                let mut series_vec = Vec::new();
+                for u256_type in u256_types.iter() {
+                    series_vec.push(u256s.to_u256_series(
+                        name.clone(),
+                        u256_type.clone(),
+                        column_encoding,
+                    )?)
+                }
+                Ok(series_vec)
+            }
+            Self::Bytes(bytes) => {
+                Ok(vec![Column::new(name.into(), bytes)])
+            }
+            Self::Hexes(hexes) => {
+                Ok(vec![Column::new(name.into(), hexes)])
+            }
+            Self::Bools(bools) => {
+                Ok(vec![Column::new(name.into(), bools)])
+            }
+            Self::Strings(strings) => {
+                Ok(vec![Column::new(name.into(), strings)])
+            }
+        }
+    }
+}
+
+impl ColumnType {
+    /// data should never be mixed type, otherwise this will return inconsistent results
+    pub fn create_column_from_values(
+        name: String,
+        data: Vec<DynSolValue>,
+        chunk_len: usize,
+        u256_types: &[U256Type],
+        column_encoding: &ColumnEncoding,
+    ) -> Result<Vec<Column>, CollectError> {
+        let values = DynValues::from_sol_values(data, column_encoding);
+        values.into_columns(name, chunk_len, u256_types, column_encoding)
+    }
 
     /// data should never be mixed type, otherwise this will return inconsistent results
     pub fn create_empty_columns(

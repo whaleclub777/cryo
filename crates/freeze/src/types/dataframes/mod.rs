@@ -11,3 +11,4 @@ pub(crate) use export::*;
 pub use read::*;
 pub(crate) use sort::SortableDataFrame;
 pub use u256s::*;
+pub use columns::*;
