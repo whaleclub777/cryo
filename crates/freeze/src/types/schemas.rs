@@ -269,7 +269,11 @@ impl Datatype {
                 .map(|s| format!("event__{s}"))
                 .collect::<Vec<_>>();
             default_columns.extend(event_names.clone());
-            all_columns.extend(event_names);
+            let expected_len = all_columns.len() + event_names.len();
+            all_columns.extend(event_names.clone());
+            if all_columns.len() != expected_len {
+                eprintln!("Warning: duplicate event names in log decoder: {:?}", event_names);
+            }
             let drop_names = [
                 "topic1".to_string(),
                 "topic2".to_string(),
@@ -535,8 +539,7 @@ mod tests {
                 None,
                 Some(
                     LogDecoder::new(
-                        "Transfer(address indexed,address indexed,uint256)"
-                            .to_string(),
+                        "Transfer(address indexed,address indexed,uint256)".to_string(),
                     )
                     .unwrap(),
                 ),
