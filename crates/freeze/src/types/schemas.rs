@@ -263,17 +263,20 @@ impl Datatype {
         let mut default_columns: Vec<_> =
             self.default_columns().iter().map(|s| s.to_string()).collect();
         if let Some(log_decoder) = &log_decoder {
-            default_columns
-                .extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
-            all_columns
-                .extend(log_decoder.field_names().into_iter().map(|s| format!("event__{s}")));
+            let event_names = log_decoder
+                .field_names()
+                .into_iter()
+                .map(|s| format!("event__{s}"))
+                .collect::<Vec<_>>();
+            default_columns.extend(event_names.clone());
+            all_columns.extend(event_names);
             let drop_names = [
                 "topic1".to_string(),
                 "topic2".to_string(),
                 "topic3".to_string(),
                 "data".to_string(),
             ];
-            all_columns.retain(|i| !drop_names.contains(i));
+            default_columns.retain(|i| !drop_names.contains(i));
             additional_column_types.extend(
                 log_decoder
                     .field_names_and_types()
@@ -516,5 +519,34 @@ mod tests {
         assert!(!table.columns().contains(&"data"));
         assert_eq!(table.columns().len(), 11);
         assert_eq!(["event__from", "event__to", "event__value"], table.columns()[8..11]);
+    }
+
+    #[test]
+    fn test_table_schema_log_decoder_include_exclude_cols() {
+        let inc_cols = vec!["topic1".to_string(), "data".to_string()];
+        let ex_cols = vec!["event__arg0".to_string()];
+        let table = Datatype::Logs
+            .table_schema(
+                &get_u256_types(),
+                &ColumnEncoding::Hex,
+                &Some(inc_cols),
+                &Some(ex_cols),
+                &None,
+                None,
+                Some(
+                    LogDecoder::new(
+                        "Transfer(address indexed,address indexed,uint256)"
+                            .to_string(),
+                    )
+                    .unwrap(),
+                ),
+            )
+            .unwrap();
+        assert!(table.columns().contains(&"topic1"));
+        assert!(!table.columns().contains(&"topic2"));
+        assert!(!table.columns().contains(&"topic3"));
+        assert!(table.columns().contains(&"data"));
+        assert_eq!(table.columns().len(), 12);
+        assert_eq!(["event__arg1", "event__arg2"], table.columns()[8..10]);
     }
 }
