@@ -3,9 +3,43 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::quote;
-use syn::{parse_macro_input, ItemStruct};
+use syn::{parse_macro_input, parse_str, ItemStruct};
+
+struct ToDataFramesMetaParams {
+    flatten: Option<String>,
+}
+
+impl ToDataFramesMetaParams {
+    fn parse_attributes(attrs: &[syn::Attribute]) -> syn::Result<Self> {
+        let mut flatten = None;
+
+        for attr in attrs.iter().filter(|a| a.path().is_ident("to_df")) {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("flatten") {
+                    let lit = meta.value()?.parse::<syn::LitStr>()?;
+                    flatten = Some(lit.value());
+                }
+                Ok(())
+            })?;
+        }
+
+        Ok(ToDataFramesMetaParams { flatten })
+    }
+}
 
 /// implements ToDataFrames and ColumnData for struct
+/// usage
+/// ```no_run
+/// #[derive(ToDataFrames)]
+/// struct MyStruct {
+///     n_rows: u64,
+///     field1: Vec<u32>,
+///     field2: Vec<String>,
+///     #[to_df(flatten = "extract_others")]
+///     others: BTreeMap<String, Vec<DynSolValue>>,
+///     chain_id: Vec<u64>,
+/// }
+/// ```
 #[proc_macro_derive(ToDataFrames, attributes(to_df))]
 pub fn to_data_frames(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as ItemStruct);
@@ -16,12 +50,12 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
     let datatype_str = name.to_string();
 
     let field_names_and_types: Vec<_> =
-        input.clone().fields.into_iter().map(|f| (f.ident.unwrap(), f.ty)).collect();
+        input.fields.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect();
 
     let field_processing: Vec<_> = field_names_and_types
         .iter()
-        .filter(|(name, _)| format!("{}", quote!(#name)) != "n_rows")
-        .filter(|(_, value)| format!("{}", quote!(#value)).starts_with("Vec"))
+        .filter(|(name, _)| quote!(#name).to_string() != "n_rows")
+        .filter(|(_, value)| quote!(#value).to_string().starts_with("Vec"))
         .filter(|(name, _)| name != "chain_id")
         .map(|(name, ty)| {
             let macro_name = match quote!(#ty).to_string().as_str() {
@@ -35,69 +69,29 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
                 }
                 _ => syn::Ident::new("with_column", Span::call_site()),
             };
-            let field_name_str = format!("{}", quote!(#name));
+            let field_name_str = quote!(#name).to_string();
             quote! {
                 #macro_name!(cols, #field_name_str, self.#name, schema);
             }
         })
         .collect();
 
-    let has_event_cols = !field_names_and_types
+    let event_code = input
+        .fields
         .iter()
-        .filter(|(name, _)| name == "event_cols")
-        .collect::<Vec<_>>()
-        .is_empty();
-    let event_code = if has_event_cols {
-        // Generate the tokens for the event processing code
-        quote! {
-            let decoder = schema.log_decoder.clone();
-            let u256_types: Vec<_> = schema.u256_types.clone().into_iter().collect();
-            if let Some(decoder) = decoder {
-                // Write columns even if there are no values decoded - indicates empty dataframe
-                let chunk_len = self.n_rows;
-                if self.event_cols.is_empty() {
-                    for param in decoder.event.inputs.iter() {
-                        let name = "event__".to_string() + param.name.as_str();
-                        let name = PlSmallStr::from_string(name);
-                        let ty = DynSolType::parse(&param.ty).unwrap();
-                        let coltype = ColumnType::from_sol_type(&ty, &schema.binary_type).unwrap();
-                        match coltype {
-                            ColumnType::UInt256 => {
-                                cols.extend(ColumnType::create_empty_u256_columns(&name, &u256_types, &schema.binary_type));
-                            },
-                            _ => {
-                                cols.push(coltype.create_empty_column(&name));
-                            },
-                        }
-                    }
-                } else {
-                    for (name, data) in self.event_cols {
-                        let series_vec = decoder.make_series(
-                            name,
-                            data,
-                            chunk_len as usize,
-                            &u256_types,
-                            &schema.binary_type,
-                        );
-                        match series_vec {
-                            Ok(s) => {
-                                cols.extend(s);
-                            }
-                            Err(e) => eprintln!("error creating frame: {}", e), /* TODO: see how best
-                                                                                 * to
-                                                                                 * bubble up error */
-                        }
-                    }
-                }
-
-                let drop_names = vec!["topic1".to_string(), "topic2".to_string(), "topic3".to_string(), "data".to_string()];
-                cols.retain(|c| !drop_names.contains(&c.name().to_string()));
+        .find_map(|f| {
+            // get path from #[to_df(flatten = "<path>")]
+            let params = ToDataFramesMetaParams::parse_attributes(&f.attrs).unwrap();
+            params.flatten.map(|s| (f, s))
+        })
+        .map(|(field, flatten)| {
+            let expr = parse_str::<syn::Expr>(&flatten).unwrap();
+            let field_name = field.ident.as_ref().unwrap();
+            let field_name_str = field_name.to_string();
+            quote! {
+                #expr(&mut cols, #field_name_str, self.#field_name, self.n_rows as usize, schema);
             }
-        }
-    } else {
-        // Generate an empty set of tokens if has_event_cols is false
-        quote! {}
-    };
+        });
 
     fn map_type_to_column_type(ty: &syn::Type) -> Option<proc_macro2::TokenStream> {
         match quote!(#ty).to_string().as_str() {

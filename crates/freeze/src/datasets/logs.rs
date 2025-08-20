@@ -21,6 +21,7 @@ pub struct Logs {
     topic3: Vec<Option<Vec<u8>>>,
     data: Vec<Vec<u8>>,
     n_data_bytes: Vec<u32>,
+    #[to_df(flatten = "extract_event_cols")]
     event_cols: indexmap::IndexMap<String, Vec<DynSolValue>>,
     chain_id: Vec<u64>,
 }
@@ -187,4 +188,64 @@ fn process_logs(logs: Vec<Log>, columns: &mut Logs, schema: &Table) -> R<()> {
     }
 
     Ok(())
+}
+
+fn extract_event_cols(
+    cols: &mut Vec<Column>,
+    _field_name: &str,
+    values: indexmap::IndexMap<String, Vec<DynSolValue>>,
+    chunk_len: usize,
+    schema: &Table,
+) {
+    let decoder = schema.log_decoder.clone();
+    let u256_types: Vec<_> = schema.u256_types.clone().into_iter().collect();
+    if let Some(decoder) = decoder {
+        // Write columns even if there are no values decoded - indicates empty dataframe
+        if values.is_empty() {
+            for param in decoder.event.inputs.iter() {
+                let name = "event__".to_string() + param.name.as_str();
+                let name = PlSmallStr::from_string(name);
+                let ty = DynSolType::parse(&param.ty).unwrap();
+                let coltype = ColumnType::from_sol_type(&ty, &schema.binary_type).unwrap();
+                match coltype {
+                    ColumnType::UInt256 => {
+                        cols.extend(ColumnType::create_empty_u256_columns(
+                            &name,
+                            &u256_types,
+                            &schema.binary_type,
+                        ));
+                    }
+                    _ => {
+                        cols.push(coltype.create_empty_column(&name));
+                    }
+                }
+            }
+        } else {
+            for (name, data) in values {
+                let series_vec = decoder.make_series(
+                    name,
+                    data,
+                    chunk_len as usize,
+                    &u256_types,
+                    &schema.binary_type,
+                );
+                match series_vec {
+                    Ok(s) => {
+                        cols.extend(s);
+                    }
+                    Err(e) => eprintln!("error creating frame: {}", e), /* TODO: see how best
+                                                                         * to
+                                                                         * bubble up error */
+                }
+            }
+        }
+
+        let drop_names = vec![
+            "topic1".to_string(),
+            "topic2".to_string(),
+            "topic3".to_string(),
+            "data".to_string(),
+        ];
+        cols.retain(|c| !drop_names.contains(&c.name().to_string()));
+    }
 }
