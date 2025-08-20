@@ -100,28 +100,15 @@ impl U256Type {
         }
     }
 
-    /// get column name suffix of U256Type, without checking NamedBinary
-    pub fn suffix_unchecked(&self) -> String {
-        match self {
-            U256Type::Binary => "_binary".to_string(),
-            U256Type::String => "_string".to_string(),
-            U256Type::F32 => "_f32".to_string(),
-            U256Type::F64 => "_f64".to_string(),
-            U256Type::U32 => "_u32".to_string(),
-            U256Type::U64 => "_u64".to_string(),
-            U256Type::Decimal128 => "_d128".to_string(),
-            U256Type::NamedBinary => panic!("Invalid U256Type for suffix"),
-        }
-    }
-
     /// get column name suffix of U256Type
-    pub fn suffix(&self, original_name: ColumnType) -> String {
+    pub fn suffix(&self, original_type: ColumnType) -> String {
         match self {
             U256Type::Binary => "_binary".to_string(),
-            U256Type::NamedBinary => match original_name {
+            U256Type::NamedBinary => match original_type {
                 ColumnType::UInt256 => "_u256binary".to_string(),
                 ColumnType::Int256 => "_i256binary".to_string(),
-                _ => format!("_{}binary", original_name.as_str()),
+                ColumnType::Binary => unreachable!("recursive binary type suffix"),
+                _ => format!("_{}binary", original_type.as_str()),
             },
             U256Type::String => "_string".to_string(),
             U256Type::F32 => "_f32".to_string(),
@@ -235,15 +222,16 @@ impl ColumnType {
     /// Create empty columns for U256 types
     pub fn create_empty_u256_columns(
         name: &str,
+        col_type: ColumnType,
         u256_types: &[U256Type],
         column_encoding: &ColumnEncoding,
     ) -> Vec<Column> {
         u256_types
             .iter()
             .map(|u256_type| {
-                let col_type = u256_type.to_columntype(column_encoding);
+                let new_type = u256_type.to_columntype(column_encoding);
                 let full_name = name.to_string() + u256_type.suffix(col_type).as_str();
-                col_type.create_empty_column(&full_name)
+                new_type.create_empty_column(&full_name)
             })
             .collect()
     }

@@ -197,9 +197,10 @@ fn extract_event_cols(
                 let name = format!("event__{name}");
                 let name = PlSmallStr::from_string(name);
                 match schema.column_type(&name) {
-                    Some(ColumnType::UInt256) => {
+                    Some(col_type) if col_type.is_256() => {
                         cols.extend(ColumnType::create_empty_u256_columns(
                             &name,
+                            col_type,
                             &u256_types,
                             &schema.binary_type,
                         ));
