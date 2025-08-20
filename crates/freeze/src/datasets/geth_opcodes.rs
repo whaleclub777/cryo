@@ -5,8 +5,7 @@ use alloy::rpc::types::trace::geth::{
 use polars::prelude::*;
 
 /// columns for geth traces
-#[cryo_to_df::to_df(Datatype::GethOpcodes)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct GethOpcodes {
     n_rows: u64,
     block_number: Vec<Option<u32>>,

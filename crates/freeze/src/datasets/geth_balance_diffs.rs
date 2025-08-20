@@ -3,8 +3,7 @@ use alloy::primitives::U256;
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::GethBalanceDiffs)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct GethBalanceDiffs {
     pub(crate) n_rows: u64,
     pub(crate) block_number: Vec<Option<u32>>,

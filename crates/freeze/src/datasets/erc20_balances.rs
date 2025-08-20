@@ -3,8 +3,7 @@ use alloy::{primitives::U256, sol_types::SolCall};
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::Erc20Balances)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct Erc20Balances {
     n_rows: u64,
     block_number: Vec<u32>,

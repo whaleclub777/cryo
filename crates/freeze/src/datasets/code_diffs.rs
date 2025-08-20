@@ -6,8 +6,7 @@ use alloy::{
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::CodeDiffs)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct CodeDiffs {
     pub(crate) n_rows: u64,
     pub(crate) block_number: Vec<Option<u32>>,

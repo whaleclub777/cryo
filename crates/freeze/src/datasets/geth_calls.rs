@@ -3,8 +3,7 @@ use alloy::{primitives::U256, rpc::types::trace::geth::CallFrame};
 use polars::prelude::*;
 
 /// columns for geth traces
-#[cryo_to_df::to_df(Datatype::GethCalls)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct GethCalls {
     n_rows: u64,
     typ: Vec<String>,

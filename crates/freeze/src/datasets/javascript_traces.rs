@@ -2,8 +2,7 @@ use crate::*;
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::JavascriptTraces)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct JavascriptTraces {
     pub(crate) n_rows: u64,
     pub(crate) block_number: Vec<Option<u32>>,

@@ -3,8 +3,7 @@ use alloy::rpc::types::trace::parity::{TraceResults, VmTrace};
 use polars::prelude::*;
 
 /// columns for transactions
-#[cryo_to_df::to_df(Datatype::VmTraces)]
-#[derive(Default)]
+#[derive(Default, cryo_to_df::ToDataFrames)]
 pub struct VmTraces {
     block_number: Vec<Option<u32>>,
     transaction_hash: Vec<Option<Vec<u8>>>,
