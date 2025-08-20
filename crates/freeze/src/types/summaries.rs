@@ -5,7 +5,7 @@ use colored::Colorize;
 use thousands::Separable;
 
 use crate::{
-    chunks::chunk_ops::ValueToString, ChunkData, ChunkStats, CollectError, ColumnType, Datatype,
+    chunks::chunk_ops::ValueToString, ChunkData, ChunkStats, CollectError, Datatype,
     Dim, ExecutionEnv, FileOutput, MetaDatatype, MultiDatatype, Partition, Query, Source, Table,
 };
 use std::path::PathBuf;
@@ -372,10 +372,10 @@ fn print_schema(name: &Datatype, schema: &Table) {
     print_header("schema for ".to_string() + name.name().as_str());
     for column in schema.columns() {
         if let Some(column_type) = schema.column_type(column) {
-            if column_type == ColumnType::UInt256 {
+            if column_type.is_256() {
                 for uint256_type in schema.u256_types.iter() {
                     print_bullet(
-                        column.to_owned() + uint256_type.suffix().as_str(),
+                        column.to_owned() + uint256_type.suffix(column_type).as_str(),
                         uint256_type.to_columntype(&schema.binary_type).as_str(),
                     );
                 }

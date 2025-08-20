@@ -110,8 +110,8 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
                 "Vec < Option < Vec < u8 > > >" => {
                     syn::Ident::new("with_column_binary", Span::call_site())
                 }
-                "Vec < U256 >" => syn::Ident::new("with_column_u256", Span::call_site()),
-                "Vec < Option < U256 > >" => {
+                "Vec < U256 >" | "Vec < I256 >" => syn::Ident::new("with_column_u256", Span::call_site()),
+                "Vec < Option < U256 > >" | "Vec < Option < I256 > >" => {
                     syn::Ident::new("with_column_option_u256", Span::call_site())
                 }
                 _ => syn::Ident::new("with_column", Span::call_site()),
@@ -149,6 +149,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             "Vec < U256 >" => Some(quote! { ColumnType::UInt256 }),
             "Vec < i32 >" => Some(quote! { ColumnType::Int32 }),
             "Vec < i64 >" => Some(quote! { ColumnType::Int64 }),
+            "Vec < I256 >" => Some(quote! { ColumnType::Int256 }),
             "Vec < f32 >" => Some(quote! { ColumnType::Float32 }),
             "Vec < f64 >" => Some(quote! { ColumnType::Float64 }),
             "Vec < String >" => Some(quote! { ColumnType::String }),
@@ -160,6 +161,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             "Vec < Option < U256 > >" => Some(quote! { ColumnType::UInt256 }),
             "Vec < Option < i32 > >" => Some(quote! { ColumnType::Int32 }),
             "Vec < Option < i64 > >" => Some(quote! { ColumnType::Int64 }),
+            "Vec < Option < I256 > >" => Some(quote! { ColumnType::Int256 }),
             "Vec < Option < f32 > >" => Some(quote! { ColumnType::Float32 }),
             "Vec < Option < f64 > >" => Some(quote! { ColumnType::Float64 }),
             "Vec < Option < String > >" => Some(quote! { ColumnType::String }),

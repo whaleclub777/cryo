@@ -26,10 +26,23 @@ macro_rules! with_column_binary {
 #[macro_export]
 macro_rules! with_column_u256 {
     ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
-        if $schema.has_column($name) {
+        if let Some(col_type) = $schema.column_type($name) {
             // binary
             if $schema.u256_types.contains(&U256Type::Binary) {
-                let name = $name.to_string() + U256Type::Binary.suffix().as_str();
+                let name = $name.to_string() + U256Type::Binary.suffix(col_type).as_str();
+                let name = PlSmallStr::from_string(name);
+
+                let converted: Vec<Vec<u8>> = $value.iter().map(|v| v.to_vec_u8()).collect();
+                if ColumnEncoding::Hex == $schema.binary_type {
+                    $all_columns.push(Column::new(name, converted.to_vec_hex()));
+                } else {
+                    $all_columns.push(Column::new(name, converted));
+                }
+            }
+
+            // named binary
+            if $schema.u256_types.contains(&U256Type::NamedBinary) {
+                let name = $name.to_string() + U256Type::NamedBinary.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Vec<u8>> = $value.iter().map(|v| v.to_vec_u8()).collect();
@@ -42,7 +55,7 @@ macro_rules! with_column_u256 {
 
             // string
             if $schema.u256_types.contains(&U256Type::String) {
-                let name = $name.to_string() + U256Type::String.suffix().as_str();
+                let name = $name.to_string() + U256Type::String.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<String> = $value.iter().map(|v| v.to_string()).collect();
@@ -51,7 +64,7 @@ macro_rules! with_column_u256 {
 
             // float32
             if $schema.u256_types.contains(&U256Type::F32) {
-                let name = $name.to_string() + U256Type::F32.suffix().as_str();
+                let name = $name.to_string() + U256Type::F32.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<f32>> =
@@ -61,7 +74,7 @@ macro_rules! with_column_u256 {
 
             // float64
             if $schema.u256_types.contains(&U256Type::F64) {
-                let name = $name.to_string() + U256Type::F64.suffix().as_str();
+                let name = $name.to_string() + U256Type::F64.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<f64>> =
@@ -71,7 +84,7 @@ macro_rules! with_column_u256 {
 
             // u32
             if $schema.u256_types.contains(&U256Type::U32) {
-                let name = $name.to_string() + U256Type::U32.suffix().as_str();
+                let name = $name.to_string() + U256Type::U32.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<u32> = $value.iter().map(|v| v.wrapping_to::<u32>()).collect();
@@ -80,7 +93,7 @@ macro_rules! with_column_u256 {
 
             // u64
             if $schema.u256_types.contains(&U256Type::U64) {
-                let name = $name.to_string() + U256Type::U64.suffix().as_str();
+                let name = $name.to_string() + U256Type::U64.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<u64> = $value.iter().map(|v| v.wrapping_to::<u64>()).collect();
@@ -99,10 +112,24 @@ macro_rules! with_column_u256 {
 #[macro_export]
 macro_rules! with_column_option_u256 {
     ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
-        if $schema.has_column($name) {
+        if let Some(col_type) = $schema.column_type($name) {
             // binary
             if $schema.u256_types.contains(&U256Type::Binary) {
-                let name = $name.to_string() + U256Type::Binary.suffix().as_str();
+                let name = $name.to_string() + U256Type::Binary.suffix(col_type).as_str();
+                let name = PlSmallStr::from_string(name);
+
+                let converted: Vec<Option<Vec<u8>>> =
+                    $value.iter().map(|v| v.map(|x| x.to_vec_u8())).collect();
+                if ColumnEncoding::Hex == $schema.binary_type {
+                    $all_columns.push(Column::new(name, converted.to_vec_hex()));
+                } else {
+                    $all_columns.push(Column::new(name, converted));
+                }
+            }
+
+            // named binary
+            if $schema.u256_types.contains(&U256Type::NamedBinary) {
+                let name = $name.to_string() + U256Type::NamedBinary.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<Vec<u8>>> =
@@ -116,7 +143,7 @@ macro_rules! with_column_option_u256 {
 
             // string
             if $schema.u256_types.contains(&U256Type::String) {
-                let name = $name.to_string() + U256Type::String.suffix().as_str();
+                let name = $name.to_string() + U256Type::String.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<String>> =
@@ -126,7 +153,7 @@ macro_rules! with_column_option_u256 {
 
             // float32
             if $schema.u256_types.contains(&U256Type::F32) {
-                let name = $name.to_string() + U256Type::F32.suffix().as_str();
+                let name = $name.to_string() + U256Type::F32.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<f32>> = $value
@@ -138,7 +165,7 @@ macro_rules! with_column_option_u256 {
 
             // float64
             if $schema.u256_types.contains(&U256Type::F64) {
-                let name = $name.to_string() + U256Type::F64.suffix().as_str();
+                let name = $name.to_string() + U256Type::F64.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<f64>> = $value
@@ -150,7 +177,7 @@ macro_rules! with_column_option_u256 {
 
             // u32
             if $schema.u256_types.contains(&U256Type::U32) {
-                let name = $name.to_string() + U256Type::U32.suffix().as_str();
+                let name = $name.to_string() + U256Type::U32.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<u32>> =
@@ -160,7 +187,7 @@ macro_rules! with_column_option_u256 {
 
             // u64
             if $schema.u256_types.contains(&U256Type::U64) {
-                let name = $name.to_string() + U256Type::U64.suffix().as_str();
+                let name = $name.to_string() + U256Type::U64.suffix(col_type).as_str();
                 let name = PlSmallStr::from_string(name);
 
                 let converted: Vec<Option<u64>> =

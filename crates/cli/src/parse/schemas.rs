@@ -85,14 +85,15 @@ pub(crate) fn parse_schemas(
 
 fn parse_u256_types(args: &Args) -> Result<Vec<U256Type>, ParseError> {
     args.u256_types.as_ref().map_or(
-        Ok(vec![U256Type::Binary, U256Type::String, U256Type::F64]),
+        Ok(vec![U256Type::NamedBinary, U256Type::String, U256Type::F64]),
         |raw_u256_types| {
             raw_u256_types
                 .iter()
                 .map(|raw| {
                     let lower_case = raw.to_lowercase();
                     match lower_case.as_str() {
-                        "binary" => Ok(U256Type::Binary),
+                        "binary" => Ok(U256Type::NamedBinary),
+                        "plain_binary" => Ok(U256Type::Binary),
                         "string" | "str" => Ok(U256Type::String),
                         "f32" | "float32" => Ok(U256Type::F32),
                         "f64" | "float64" | "float" => Ok(U256Type::F64),
