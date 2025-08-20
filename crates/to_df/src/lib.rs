@@ -15,6 +15,7 @@ impl ToDataFramesMetaParams {
 
         for attr in attrs.iter().filter(|a| a.path().is_ident("to_df")) {
             attr.parse_nested_meta(|meta| {
+                // get path from #[to_df(flatten = "<path>")]
                 if meta.path.is_ident("flatten") {
                     let lit = meta.value()?.parse::<syn::LitStr>()?;
                     flatten = Some(lit.value());
@@ -31,14 +32,59 @@ impl ToDataFramesMetaParams {
 ///
 /// Usage:
 /// ```no_run
+/// # use cryo_to_df::ToDataFrames;
+/// # type DynSolValue = u64;
+/// # pub mod cryo_freeze {
+/// #     pub mod indexmap { pub use std::collections::BTreeMap as IndexMap; }
+/// #     pub mod polars {
+/// #         pub mod prelude {
+/// #             pub struct DataFrame; impl DataFrame { pub fn new<T>(_: T) -> Result<Self, ()> { Ok(Self) } }
+/// #             pub struct Column;
+/// #         }
+/// #     }
+/// #     use polars::prelude::*;
+/// #     use std::collections::HashMap;
+/// #     pub enum ColumnType { Boolean, UInt32, UInt64, UInt256, Int32, Int64, Float32, Float64, String, Binary }
+/// #     pub enum CollectError { PolarsError(()) }
+/// #     #[derive(Hash, PartialEq, Eq)]
+/// #     pub enum Datatype { MyStruct }
+/// #     pub struct Table; impl Table { pub fn columns(&self) -> Vec<&'static str> { vec![] } }
+/// #     pub trait SortableDataFrame { fn sort_by_schema(self, schema: &Table) -> Self; }
+/// #     impl SortableDataFrame for Result<DataFrame, CollectError> { fn sort_by_schema(self, schema: &Table) -> Self { self } }
+/// #     #[macro_export]
+/// #     macro_rules! with_column_impl { ($cols:expr, $name:expr, $value:expr, $schema:expr) => {let _: Vec<Column> = $cols;}; }
+/// #     pub use with_column_impl as with_column;
+/// #     pub use with_column_impl as with_column_binary;
+/// #     pub use with_column_impl as with_column_u256;
+/// #     pub use with_column_impl as with_column_option_u256;
+/// #     pub trait ColumnData {
+/// #         fn column_types() -> indexmap::IndexMap<&'static str, ColumnType>;
+/// #     }
+/// #     pub trait ToDataFrames: Sized {
+/// #         fn create_dfs(self, schemas: &HashMap<Datatype, Table>, chain_id: u64) -> Result<HashMap<Datatype, DataFrame>, CollectError>;
+/// #     }
+/// # }
+/// use cryo_freeze::*;
+/// use polars::prelude::*;
+///
 /// #[derive(ToDataFrames)]
 /// struct MyStruct {
 ///     n_rows: u64,
 ///     field1: Vec<u32>,
 ///     field2: Vec<String>,
 ///     #[to_df(flatten = "extract_others")]
-///     others: BTreeMap<String, Vec<DynSolValue>>,
+///     others: indexmap::IndexMap<String, Vec<DynSolValue>>,
 ///     chain_id: Vec<u64>,
+/// }
+///
+/// fn extract_others(
+///     cols: &mut Vec<Column>,
+///     name: &str,
+///     values: indexmap::IndexMap<String, Vec<DynSolValue>>,
+///     n_rows: usize,
+///     schema: &Table,
+/// ) {
+///     todo!()
 /// }
 /// ```
 #[proc_macro_derive(ToDataFrames, attributes(to_df))]
@@ -77,11 +123,11 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
         })
         .collect();
 
+    let mut flatten_field = None;
     let event_code = input
         .fields
         .iter()
         .find_map(|f| {
-            // get path from #[to_df(flatten = "<path>")]
             let params = ToDataFramesMetaParams::parse_attributes(&f.attrs).unwrap();
             params.flatten.map(|s| (f, s))
         })
@@ -89,6 +135,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             let expr = parse_str::<syn::Expr>(&flatten).unwrap();
             let field_name = field.ident.as_ref().unwrap();
             let field_name_str = field_name.to_string();
+            flatten_field = Some(field_name_str.clone());
             quote! {
                 #expr(&mut cols, #field_name_str, self.#field_name, self.n_rows as usize, schema);
             }
@@ -127,7 +174,9 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
         if let Some(column_type) = map_type_to_column_type(ty) {
             let field_name_str = format!("{}", quote!(#name));
             column_types.push(quote! { (#field_name_str, #column_type) });
-        } else if name != "n_rows" && name != "event_cols" {
+        } else if name != "n_rows" &&
+            (flatten_field.is_none() || name != flatten_field.as_deref().unwrap())
+        {
             println!("invalid column type for {name} in table {datatype_str}");
         }
     }
@@ -139,7 +188,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
                 self,
                 schemas: &std::collections::HashMap<Datatype, Table>,
                 chain_id: u64,
-            ) -> R<std::collections::HashMap<Datatype, DataFrame>> {
+            ) -> Result<std::collections::HashMap<Datatype, DataFrame>, CollectError> {
                 let datatype = #datatype;
                 let schema = schemas.get(&datatype).expect("schema not provided");
                 let mut cols = Vec::with_capacity(schema.columns().len());
