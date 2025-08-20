@@ -132,10 +132,22 @@ fn process_logs(logs: Vec<Log>, columns: &mut Logs, schema: &Table) -> R<()> {
                         // value);     }
                         // }
                         for (indexed_param, name) in log.indexed.into_iter().zip(indexed_keys) {
-                            columns.event_cols.entry(name.clone()).or_default().push(indexed_param);
+                            if schema.has_column(&format!("event__{name}")) {
+                                columns
+                                    .event_cols
+                                    .entry(name.clone())
+                                    .or_default()
+                                    .push(indexed_param);
+                            }
                         }
                         for (body_param, name) in log.body.into_iter().zip(body_keys) {
-                            columns.event_cols.entry(name.clone()).or_default().push(body_param);
+                            if schema.has_column(&format!("event__{name}")) {
+                                columns
+                                    .event_cols
+                                    .entry(name.clone())
+                                    .or_default()
+                                    .push(body_param);
+                            }
                         }
                     }
                     Err(_) => continue,
@@ -182,7 +194,10 @@ fn extract_event_cols(
         // Write columns even if there are no values decoded - indicates empty dataframe
         if values.is_empty() {
             for (param, name) in decoder.event.inputs.iter().zip(decoder.field_names()) {
-                let name = "event__".to_string() + name.as_str();
+                let name = format!("event__{name}");
+                if !schema.has_column(&name) {
+                    continue;
+                }
                 let name = PlSmallStr::from_string(name);
                 let ty = DynSolType::parse(&param.ty).unwrap();
                 let coltype = ColumnType::from_sol_type(&ty, &schema.binary_type).unwrap();
@@ -201,6 +216,10 @@ fn extract_event_cols(
             }
         } else {
             for (name, data) in values {
+                let name = format!("event__{name}");
+                if !schema.has_column(&name) {
+                    continue;
+                }
                 let series_vec =
                     decoder.make_series(name, data, chunk_len, &u256_types, &schema.binary_type);
                 match series_vec {
