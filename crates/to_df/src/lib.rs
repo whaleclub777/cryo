@@ -27,8 +27,9 @@ impl ToDataFramesMetaParams {
     }
 }
 
-/// implements ToDataFrames and ColumnData for struct
-/// usage
+/// Implements ToDataFrames and ColumnData for struct.
+///
+/// Usage:
 /// ```no_run
 /// #[derive(ToDataFrames)]
 /// struct MyStruct {
