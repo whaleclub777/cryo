@@ -1,6 +1,6 @@
 use crate::*;
 use alloy::{
-    dyn_abi::{DynSolType, DynSolValue, EventExt},
+    dyn_abi::{DynSolValue, EventExt},
     rpc::types::Log,
 };
 use polars::prelude::*;
@@ -193,25 +193,21 @@ fn extract_event_cols(
     if let Some(decoder) = &schema.log_decoder {
         // Write columns even if there are no values decoded - indicates empty dataframe
         if values.is_empty() {
-            for (param, name) in decoder.event.inputs.iter().zip(decoder.field_names()) {
+            for name in decoder.field_names() {
                 let name = format!("event__{name}");
-                if !schema.has_column(&name) {
-                    continue;
-                }
                 let name = PlSmallStr::from_string(name);
-                let ty = DynSolType::parse(&param.ty).unwrap();
-                let coltype = ColumnType::from_sol_type(&ty, &schema.binary_type).unwrap();
-                match coltype {
-                    ColumnType::UInt256 => {
+                match schema.column_type(&name) {
+                    Some(ColumnType::UInt256) => {
                         cols.extend(ColumnType::create_empty_u256_columns(
                             &name,
                             &u256_types,
                             &schema.binary_type,
                         ));
                     }
-                    _ => {
+                    Some(coltype) => {
                         cols.push(coltype.create_empty_column(&name));
                     }
+                    _ => {}
                 }
             }
         } else {
