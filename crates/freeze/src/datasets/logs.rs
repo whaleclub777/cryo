@@ -1,6 +1,6 @@
 use crate::*;
 use alloy::{
-    dyn_abi::{DynSolType, DynSolValue, EventExt},
+    dyn_abi::{DynSolValue, EventExt},
     rpc::types::Log,
 };
 use polars::prelude::*;
@@ -110,20 +110,8 @@ fn process_logs(logs: Vec<Log>, columns: &mut Logs, schema: &Table) -> R<()> {
     let (indexed_keys, body_keys) = match &schema.log_decoder {
         None => (None, None),
         Some(decoder) => {
-            let indexed: Vec<String> = decoder
-                .event
-                .inputs
-                .clone()
-                .into_iter()
-                .filter_map(|x| if x.indexed { Some(x.name) } else { None })
-                .collect();
-            let body: Vec<String> = decoder
-                .event
-                .inputs
-                .clone()
-                .into_iter()
-                .filter_map(|x| if x.indexed { None } else { Some(x.name) })
-                .collect();
+            let indexed = decoder.indexed_names();
+            let body = decoder.body_names();
             (Some(indexed), Some(body))
         }
     };
@@ -143,19 +131,23 @@ fn process_logs(logs: Vec<Log>, columns: &mut Logs, schema: &Table) -> R<()> {
                         //         columns.event_cols.entry(param.name).or_default().push(param.
                         // value);     }
                         // }
-                        for (idx, indexed_param) in log.indexed.into_iter().enumerate() {
-                            columns
-                                .event_cols
-                                .entry(indexed_keys[idx].clone())
-                                .or_default()
-                                .push(indexed_param);
+                        for (indexed_param, name) in log.indexed.into_iter().zip(indexed_keys) {
+                            if schema.has_column(&format!("event__{name}")) {
+                                columns
+                                    .event_cols
+                                    .entry(name.clone())
+                                    .or_default()
+                                    .push(indexed_param);
+                            }
                         }
-                        for (idx, body_param) in log.body.into_iter().enumerate() {
-                            columns
-                                .event_cols
-                                .entry(body_keys[idx].clone())
-                                .or_default()
-                                .push(body_param);
+                        for (body_param, name) in log.body.into_iter().zip(body_keys) {
+                            if schema.has_column(&format!("event__{name}")) {
+                                columns
+                                    .event_cols
+                                    .entry(name.clone())
+                                    .or_default()
+                                    .push(body_param);
+                            }
                         }
                     }
                     Err(_) => continue,
@@ -197,31 +189,33 @@ fn extract_event_cols(
     chunk_len: usize,
     schema: &Table,
 ) {
-    let decoder = schema.log_decoder.clone();
     let u256_types: Vec<_> = schema.u256_types.clone().into_iter().collect();
-    if let Some(decoder) = decoder {
+    if let Some(decoder) = &schema.log_decoder {
         // Write columns even if there are no values decoded - indicates empty dataframe
         if values.is_empty() {
-            for param in decoder.event.inputs.iter() {
-                let name = "event__".to_string() + param.name.as_str();
+            for name in decoder.field_names() {
+                let name = format!("event__{name}");
                 let name = PlSmallStr::from_string(name);
-                let ty = DynSolType::parse(&param.ty).unwrap();
-                let coltype = ColumnType::from_sol_type(&ty, &schema.binary_type).unwrap();
-                match coltype {
-                    ColumnType::UInt256 => {
+                match schema.column_type(&name) {
+                    Some(ColumnType::UInt256) => {
                         cols.extend(ColumnType::create_empty_u256_columns(
                             &name,
                             &u256_types,
                             &schema.binary_type,
                         ));
                     }
-                    _ => {
+                    Some(coltype) => {
                         cols.push(coltype.create_empty_column(&name));
                     }
+                    _ => {}
                 }
             }
         } else {
             for (name, data) in values {
+                let name = format!("event__{name}");
+                if !schema.has_column(&name) {
+                    continue;
+                }
                 let series_vec =
                     decoder.make_series(name, data, chunk_len, &u256_types, &schema.binary_type);
                 match series_vec {
@@ -234,9 +228,5 @@ fn extract_event_cols(
                 }
             }
         }
-
-        let drop_names =
-            ["topic1".to_string(), "topic2".to_string(), "topic3".to_string(), "data".to_string()];
-        cols.retain(|c| !drop_names.contains(&c.name().to_string()));
     }
 }

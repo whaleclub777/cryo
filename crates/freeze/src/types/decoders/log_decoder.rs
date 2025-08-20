@@ -2,7 +2,7 @@ use crate::{err, CollectError, ColumnEncoding, ToU256Series, U256Type};
 use alloy::{
     dyn_abi::{DynSolType, DynSolValue, EventExt},
     hex::ToHexExt,
-    json_abi::Event,
+    json_abi::{Event, EventParam},
     primitives::{I256, U256},
     rpc::types::Log,
 };
@@ -16,6 +16,14 @@ pub struct LogDecoder {
     pub raw: String,
     /// decoded abi type of event signature string
     pub event: Event,
+}
+
+fn get_param_name(param: &EventParam, idx: usize) -> String {
+    if param.name.is_empty() {
+        format!("arg{idx}")
+    } else {
+        param.name.clone()
+    }
 }
 
 impl LogDecoder {
@@ -35,7 +43,36 @@ impl LogDecoder {
 
     /// get field names of event inputs
     pub fn field_names(&self) -> Vec<String> {
-        self.event.inputs.iter().map(|i| i.name.clone()).collect()
+        self.event
+            .inputs
+            .iter()
+            .enumerate()
+            .map(|(idx, param)| get_param_name(param, idx))
+            .collect()
+    }
+
+    /// get field names of indexed event inputs
+    pub fn indexed_names(&self) -> Vec<String> {
+        self.event
+            .inputs
+            .iter()
+            .enumerate()
+            .filter_map(
+                |(idx, param)| if param.indexed { Some(get_param_name(param, idx)) } else { None },
+            )
+            .collect()
+    }
+
+    /// get field names of non-indexed event inputs
+    pub fn body_names(&self) -> Vec<String> {
+        self.event
+            .inputs
+            .iter()
+            .enumerate()
+            .filter_map(
+                |(idx, param)| if !param.indexed { Some(get_param_name(param, idx)) } else { None },
+            )
+            .collect()
     }
 
     /// get field types of event inputs
@@ -48,7 +85,8 @@ impl LogDecoder {
         self.event
             .inputs
             .iter()
-            .map(|i| (i.name.clone(), DynSolType::parse(&i.ty).unwrap()))
+            .enumerate()
+            .map(|(idx, param)| (get_param_name(param, idx), DynSolType::parse(&param.ty).unwrap()))
             .collect()
     }
 
@@ -151,7 +189,6 @@ impl LogDecoder {
 
         // check each vector, see if it contains any values, if it does, check if it's the same
         // length as the input data and map to a series
-        let name = format!("event__{name}");
         if !ints.is_empty() {
             Ok(vec![Column::new(name.into(), ints)])
         } else if !i256s.is_empty() {
