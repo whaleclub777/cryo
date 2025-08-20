@@ -222,30 +222,21 @@ fn extract_event_cols(
             }
         } else {
             for (name, data) in values {
-                let series_vec = decoder.make_series(
-                    name,
-                    data,
-                    chunk_len as usize,
-                    &u256_types,
-                    &schema.binary_type,
-                );
+                let series_vec =
+                    decoder.make_series(name, data, chunk_len, &u256_types, &schema.binary_type);
                 match series_vec {
                     Ok(s) => {
                         cols.extend(s);
                     }
-                    Err(e) => eprintln!("error creating frame: {}", e), /* TODO: see how best
-                                                                         * to
-                                                                         * bubble up error */
+                    Err(e) => eprintln!("error creating frame: {e}"), /* TODO: see how best
+                                                                       * to
+                                                                       * bubble up error */
                 }
             }
         }
 
-        let drop_names = vec![
-            "topic1".to_string(),
-            "topic2".to_string(),
-            "topic3".to_string(),
-            "data".to_string(),
-        ];
+        let drop_names =
+            ["topic1".to_string(), "topic2".to_string(), "topic3".to_string(), "data".to_string()];
         cols.retain(|c| !drop_names.contains(&c.name().to_string()));
     }
 }
