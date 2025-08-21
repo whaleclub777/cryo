@@ -4,7 +4,7 @@ use polars::{prelude::{Column, NamedFrom}, series::Series};
 use crate::{err, CollectError, ColumnEncoding, ColumnType, ToU256Series, U256Type};
 
 /// alias of `Vec<u8>`
-pub type Bytes = Vec<u8>;
+pub type RawBytes = Vec<u8>;
 
 /// A vector that can hold either values or optional values.
 pub enum OptionVec<T> {
@@ -79,7 +79,7 @@ pub enum DynValues {
     /// i256
     I256s(OptionVec<I256>),
     /// bytes
-    Bytes(OptionVec<Bytes>),
+    Bytes(OptionVec<RawBytes>),
     /// hex
     Hexes(OptionVec<String>),
     /// bool
@@ -88,10 +88,29 @@ pub enum DynValues {
     Strings(OptionVec<String>),
 }
 
-impl From<Vec<U256>> for DynValues {
-    fn from(value: Vec<U256>) -> Self {
-        DynValues::U256s(OptionVec::Some(value))
-    }
+macro_rules! impl_from_vec {
+    ($($ty:ty => $variant:ident,)+) => {
+        $(impl From<Vec<$ty>> for DynValues {
+            fn from(value: Vec<$ty>) -> Self {
+                DynValues::$variant(OptionVec::Some(value))
+            }
+        }
+        impl From<Vec<Option<$ty>>> for DynValues {
+            fn from(value: Vec<Option<$ty>>) -> Self {
+                DynValues::$variant(OptionVec::Option(value))
+            }
+        })+
+    };
+}
+
+impl_from_vec! {
+    i64 => Ints,
+    u64 => UInts,
+    U256 => U256s,
+    I256 => I256s,
+    RawBytes => Bytes,
+    String => Strings,
+    bool => Bools,
 }
 
 impl DynValues {
@@ -280,9 +299,9 @@ impl ColumnType {
             ColumnType::Int256 => Column::new(format!("{name}_i256binary").into(), Vec::<Vec<u8>>::new()),
             ColumnType::Float32 => Column::new(name.into(), Vec::<f32>::new()),
             ColumnType::Float64 => Column::new(name.into(), Vec::<f64>::new()),
-            ColumnType::Decimal128 => Column::new(name.into(), Vec::<Bytes>::new()),
+            ColumnType::Decimal128 => Column::new(name.into(), Vec::<RawBytes>::new()),
             ColumnType::String => Column::new(name.into(), Vec::<String>::new()),
-            ColumnType::Binary => Column::new(name.into(), Vec::<Bytes>::new()),
+            ColumnType::Binary => Column::new(name.into(), Vec::<RawBytes>::new()),
             ColumnType::Hex => Column::new(name.into(), Vec::<String>::new()),
         }
     }
