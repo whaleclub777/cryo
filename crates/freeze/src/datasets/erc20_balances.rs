@@ -7,8 +7,8 @@ use polars::prelude::*;
 pub struct Erc20Balances {
     n_rows: u64,
     block_number: Vec<u32>,
-    erc20: Vec<Vec<u8>>,
-    address: Vec<Vec<u8>>,
+    erc20: Vec<RawBytes>,
+    address: Vec<RawBytes>,
     balance: Vec<Option<U256>>,
     chain_id: Vec<u64>,
 }
@@ -26,7 +26,7 @@ impl Dataset for Erc20Balances {
 
 #[async_trait::async_trait]
 impl CollectByBlock for Erc20Balances {
-    type Response = (u32, Vec<u8>, Vec<u8>, Option<U256>);
+    type Response = (u32, RawBytes, RawBytes, Option<U256>);
 
     async fn extract(request: Params, source: Arc<Source>, _: Arc<Query>) -> R<Self::Response> {
         let signature = ERC20::balanceOfCall::SELECTOR;

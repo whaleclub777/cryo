@@ -106,16 +106,15 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
         .filter(|(name, _)| name != "chain_id")
         .map(|(name, ty)| {
             let macro_name = match quote!(#ty).to_string().as_str() {
-                "Vec < Vec < u8 > >" => syn::Ident::new("with_column_binary", Span::call_site()),
-                "Vec < Option < Vec < u8 > > >" => {
-                    syn::Ident::new("with_column_binary", Span::call_site())
+                "Vec < Vec < u8 > >" | "Vec < RawBytes >" => "with_column_binary",
+                "Vec < Option < Vec < u8 > > >" | "Vec < Option < RawBytes > >" => {
+                    "with_column_binary"
                 }
-                "Vec < U256 >" => syn::Ident::new("with_column_u256", Span::call_site()),
-                "Vec < Option < U256 > >" => {
-                    syn::Ident::new("with_column_option_u256", Span::call_site())
-                }
-                _ => syn::Ident::new("with_column", Span::call_site()),
+                "Vec < U256 >" | "Vec < I256 >" => "with_column_u256",
+                "Vec < Option < U256 > >" | "Vec < Option < I256 > >" => "with_column_u256",
+                _ => "with_column",
             };
+            let macro_name = syn::Ident::new(macro_name, Span::call_site());
             let field_name_str = quote!(#name).to_string();
             quote! {
                 #macro_name!(cols, #field_name_str, self.#name, schema);
@@ -149,10 +148,12 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             "Vec < U256 >" => Some(quote! { ColumnType::UInt256 }),
             "Vec < i32 >" => Some(quote! { ColumnType::Int32 }),
             "Vec < i64 >" => Some(quote! { ColumnType::Int64 }),
+            "Vec < I256 >" => Some(quote! { ColumnType::Int256 }),
             "Vec < f32 >" => Some(quote! { ColumnType::Float32 }),
             "Vec < f64 >" => Some(quote! { ColumnType::Float64 }),
             "Vec < String >" => Some(quote! { ColumnType::String }),
             "Vec < Vec < u8 > >" => Some(quote! { ColumnType::Binary }),
+            "Vec < RawBytes >" => Some(quote! { ColumnType::Binary }),
 
             "Vec < Option < bool > >" => Some(quote! { ColumnType::Boolean }),
             "Vec < Option < u32 > >" => Some(quote! { ColumnType::UInt32 }),
@@ -160,10 +161,12 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             "Vec < Option < U256 > >" => Some(quote! { ColumnType::UInt256 }),
             "Vec < Option < i32 > >" => Some(quote! { ColumnType::Int32 }),
             "Vec < Option < i64 > >" => Some(quote! { ColumnType::Int64 }),
+            "Vec < Option < I256 > >" => Some(quote! { ColumnType::Int256 }),
             "Vec < Option < f32 > >" => Some(quote! { ColumnType::Float32 }),
             "Vec < Option < f64 > >" => Some(quote! { ColumnType::Float64 }),
             "Vec < Option < String > >" => Some(quote! { ColumnType::String }),
             "Vec < Option < Vec < u8 > > >" => Some(quote! { ColumnType::Binary }),
+            "Vec < Option < RawBytes > >" => Some(quote! { ColumnType::Binary }),
             _ => None,
             // _ => quote! {ColumnType::Binary},
         }

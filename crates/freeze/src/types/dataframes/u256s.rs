@@ -13,6 +13,34 @@ pub trait ToU256Series {
     ) -> Result<Column, CollectError>;
 }
 
+impl ToU256Series for OptionVec<U256> {
+    fn to_u256_series(
+        &self,
+        name: String,
+        dtype: U256Type,
+        column_encoding: &ColumnEncoding,
+    ) -> Result<Column, CollectError> {
+        match self {
+            OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
+            OptionVec::Option(v) => v.to_u256_series(name, dtype, column_encoding),
+        }
+    }
+}
+
+impl ToU256Series for OptionVec<I256> {
+    fn to_u256_series(
+        &self,
+        name: String,
+        dtype: U256Type,
+        column_encoding: &ColumnEncoding,
+    ) -> Result<Column, CollectError> {
+        match self {
+            OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
+            OptionVec::Option(v) => v.to_u256_series(name, dtype, column_encoding),
+        }
+    }
+}
+
 impl ToU256Series for Vec<U256> {
     fn to_u256_series(
         &self,
@@ -20,12 +48,12 @@ impl ToU256Series for Vec<U256> {
         dtype: U256Type,
         column_encoding: &ColumnEncoding,
     ) -> Result<Column, CollectError> {
-        let name = name + dtype.suffix().as_str();
+        let name = name + dtype.suffix(ColumnType::UInt256).as_str();
         let name = PlSmallStr::from_string(name);
 
         match dtype {
-            U256Type::Binary => {
-                let converted: Vec<Vec<u8>> = self.iter().map(|v| v.to_vec_u8()).collect();
+            U256Type::Binary | U256Type::NamedBinary => {
+                let converted: Vec<RawBytes> = self.iter().map(|v| v.to_vec_u8()).collect();
                 match column_encoding {
                     ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
@@ -67,12 +95,12 @@ impl ToU256Series for Vec<Option<U256>> {
         dtype: U256Type,
         column_encoding: &ColumnEncoding,
     ) -> Result<Column, CollectError> {
-        let name = name + dtype.suffix().as_str();
+        let name = name + dtype.suffix(ColumnType::UInt256).as_str();
         let name = PlSmallStr::from_string(name);
 
         match dtype {
-            U256Type::Binary => {
-                let converted: Vec<Option<Vec<u8>>> =
+            U256Type::Binary | U256Type::NamedBinary => {
+                let converted: Vec<Option<RawBytes>> =
                     self.iter().map(|v| v.map(|x| x.to_vec_u8())).collect();
                 match column_encoding {
                     ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),
@@ -122,12 +150,12 @@ impl ToU256Series for Vec<I256> {
         dtype: U256Type,
         column_encoding: &ColumnEncoding,
     ) -> Result<Column, CollectError> {
-        let name = name + dtype.suffix().as_str();
+        let name = name + dtype.suffix(ColumnType::Int256).as_str();
         let name = PlSmallStr::from_string(name);
 
         match dtype {
-            U256Type::Binary => {
-                let converted: Vec<Vec<u8>> = self.iter().map(|v| v.to_vec_u8()).collect();
+            U256Type::Binary | U256Type::NamedBinary => {
+                let converted: Vec<RawBytes> = self.iter().map(|v| v.to_vec_u8()).collect();
                 match column_encoding {
                     ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
@@ -169,12 +197,12 @@ impl ToU256Series for Vec<Option<I256>> {
         dtype: U256Type,
         column_encoding: &ColumnEncoding,
     ) -> Result<Column, CollectError> {
-        let name = name + dtype.suffix().as_str();
+        let name = name + dtype.suffix(ColumnType::Int256).as_str();
         let name = PlSmallStr::from_string(name);
 
         match dtype {
-            U256Type::Binary => {
-                let converted: Vec<Option<Vec<u8>>> =
+            U256Type::Binary | U256Type::NamedBinary => {
+                let converted: Vec<Option<RawBytes>> =
                     self.iter().map(|v| v.map(|x| x.to_vec_u8())).collect();
                 match column_encoding {
                     ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),

@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use crate::{err, CollectError, ColumnEncoding, Datatype, LogDecoder};
 use alloy::dyn_abi::DynSolType;
 use indexmap::{IndexMap, IndexSet};
-use polars::prelude::Column;
 use thiserror::Error;
 
 /// collection of schemas
@@ -65,6 +64,10 @@ impl Table {
 pub enum U256Type {
     /// Binary representation
     Binary,
+    /// Binary representation, but with a variant name,
+    /// for U256, suffix would be _u256binary,
+    /// for I256, suffix would be _i256binary.
+    NamedBinary,
     /// String representation
     String,
     /// F32 representation
@@ -83,7 +86,7 @@ impl U256Type {
     /// convert U256Type to Columntype
     pub fn to_columntype(&self, column_encoding: &ColumnEncoding) -> ColumnType {
         match self {
-            U256Type::Binary => match column_encoding {
+            U256Type::Binary | U256Type::NamedBinary => match column_encoding {
                 ColumnEncoding::Binary => ColumnType::Binary,
                 ColumnEncoding::Hex => ColumnType::Hex,
             },
@@ -97,9 +100,15 @@ impl U256Type {
     }
 
     /// get column name suffix of U256Type
-    pub fn suffix(&self) -> String {
+    pub fn suffix(&self, original_type: ColumnType) -> String {
         match self {
             U256Type::Binary => "_binary".to_string(),
+            U256Type::NamedBinary => match original_type {
+                ColumnType::UInt256 => "_u256binary".to_string(),
+                ColumnType::Int256 => "_i256binary".to_string(),
+                ColumnType::Binary => unreachable!("recursive binary type suffix"),
+                _ => format!("_{}binary", original_type.as_str()),
+            },
             U256Type::String => "_string".to_string(),
             U256Type::F32 => "_f32".to_string(),
             U256Type::F64 => "_f64".to_string(),
@@ -125,6 +134,8 @@ pub enum ColumnType {
     Int32,
     /// Int64 column type
     Int64,
+    /// U256 column type
+    Int256,
     /// Float32 column type
     Float32,
     /// Float64 column type
@@ -140,6 +151,11 @@ pub enum ColumnType {
 }
 
 impl ColumnType {
+    /// check if column is UInt256 or Int256
+    pub fn is_256(&self) -> bool {
+        matches!(self, ColumnType::UInt256 | ColumnType::Int256)
+    }
+
     /// convert ColumnType to str
     pub fn as_str(&self) -> &'static str {
         match *self {
@@ -149,6 +165,7 @@ impl ColumnType {
             ColumnType::UInt256 => "uint256",
             ColumnType::Int32 => "int32",
             ColumnType::Int64 => "int64",
+            ColumnType::Int256 => "int256",
             ColumnType::Float32 => "float32",
             ColumnType::Float64 => "float64",
             ColumnType::Decimal128 => "decimal128",
@@ -176,7 +193,7 @@ impl ColumnType {
                 if *bits <= 64 {
                     ColumnType::Int64
                 } else {
-                    ColumnType::UInt256
+                    ColumnType::Int256
                 }
             }
             DynSolType::Uint(bits) => {
@@ -196,40 +213,6 @@ impl ColumnType {
             // _ => return Err(SchemaError::InvalidSolType("Unknown")),
         };
         Ok(result)
-    }
-
-    /// Create empty columns for U256 types
-    pub fn create_empty_u256_columns(
-        name: &str,
-        u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
-    ) -> Vec<Column> {
-        u256_types
-            .iter()
-            .map(|u256_type| {
-                let col_type = u256_type.to_columntype(column_encoding);
-                let full_name = name.to_string() + u256_type.suffix().as_str();
-                col_type.create_empty_column(&full_name)
-            })
-            .collect()
-    }
-
-    /// Create an empty column of the specified type
-    pub fn create_empty_column(self, name: &str) -> Column {
-        match self {
-            ColumnType::Boolean => Column::new(name.into(), Vec::<bool>::new()),
-            ColumnType::UInt32 => Column::new(name.into(), Vec::<u32>::new()),
-            ColumnType::UInt64 => Column::new(name.into(), Vec::<u64>::new()),
-            ColumnType::UInt256 => Column::new(name.into(), Vec::<Vec<u8>>::new()),
-            ColumnType::Int32 => Column::new(name.into(), Vec::<i32>::new()),
-            ColumnType::Int64 => Column::new(name.into(), Vec::<i64>::new()),
-            ColumnType::Float32 => Column::new(name.into(), Vec::<f32>::new()),
-            ColumnType::Float64 => Column::new(name.into(), Vec::<f64>::new()),
-            ColumnType::Decimal128 => Column::new(name.into(), Vec::<Vec<u8>>::new()),
-            ColumnType::String => Column::new(name.into(), Vec::<String>::new()),
-            ColumnType::Binary => Column::new(name.into(), Vec::<Vec<u8>>::new()),
-            ColumnType::Hex => Column::new(name.into(), Vec::<String>::new()),
-        }
     }
 }
 

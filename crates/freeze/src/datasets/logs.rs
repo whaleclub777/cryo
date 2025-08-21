@@ -10,16 +10,16 @@ use polars::prelude::*;
 pub struct Logs {
     n_rows: u64,
     block_number: Vec<u32>,
-    block_hash: Vec<Option<Vec<u8>>>,
+    block_hash: Vec<Option<RawBytes>>,
     transaction_index: Vec<u32>,
     log_index: Vec<u32>,
-    transaction_hash: Vec<Vec<u8>>,
-    address: Vec<Vec<u8>>,
-    topic0: Vec<Option<Vec<u8>>>,
-    topic1: Vec<Option<Vec<u8>>>,
-    topic2: Vec<Option<Vec<u8>>>,
-    topic3: Vec<Option<Vec<u8>>>,
-    data: Vec<Vec<u8>>,
+    transaction_hash: Vec<RawBytes>,
+    address: Vec<RawBytes>,
+    topic0: Vec<Option<RawBytes>>,
+    topic1: Vec<Option<RawBytes>>,
+    topic2: Vec<Option<RawBytes>>,
+    topic3: Vec<Option<RawBytes>>,
+    data: Vec<RawBytes>,
     n_data_bytes: Vec<u32>,
     #[to_df(flatten = "extract_event_cols")]
     event_cols: indexmap::IndexMap<String, Vec<DynSolValue>>,
@@ -196,18 +196,12 @@ fn extract_event_cols(
             for name in decoder.field_names() {
                 let name = format!("event__{name}");
                 let name = PlSmallStr::from_string(name);
-                match schema.column_type(&name) {
-                    Some(ColumnType::UInt256) => {
-                        cols.extend(ColumnType::create_empty_u256_columns(
-                            &name,
-                            &u256_types,
-                            &schema.binary_type,
-                        ));
-                    }
-                    Some(coltype) => {
-                        cols.push(coltype.create_empty_column(&name));
-                    }
-                    _ => {}
+                if let Some(col_type) = schema.column_type(&name) {
+                    cols.extend(col_type.create_empty_columns(
+                        &name,
+                        &u256_types,
+                        &schema.binary_type,
+                    ));
                 }
             }
         } else {
@@ -216,8 +210,13 @@ fn extract_event_cols(
                 if !schema.has_column(&name) {
                     continue;
                 }
-                let series_vec =
-                    decoder.make_series(name, data, chunk_len, &u256_types, &schema.binary_type);
+                let series_vec = ColumnType::create_column_from_values(
+                    name,
+                    data,
+                    chunk_len,
+                    &u256_types,
+                    &schema.binary_type,
+                );
                 match series_vec {
                     Ok(s) => {
                         cols.extend(s);

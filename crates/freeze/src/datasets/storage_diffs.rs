@@ -11,11 +11,11 @@ pub struct StorageDiffs {
     pub(crate) n_rows: u64,
     pub(crate) block_number: Vec<Option<u32>>,
     pub(crate) transaction_index: Vec<Option<u32>>,
-    pub(crate) transaction_hash: Vec<Option<Vec<u8>>>,
-    pub(crate) address: Vec<Vec<u8>>,
-    pub(crate) slot: Vec<Vec<u8>>,
-    pub(crate) from_value: Vec<Vec<u8>>,
-    pub(crate) to_value: Vec<Vec<u8>>,
+    pub(crate) transaction_hash: Vec<Option<RawBytes>>,
+    pub(crate) address: Vec<RawBytes>,
+    pub(crate) slot: Vec<RawBytes>,
+    pub(crate) from_value: Vec<RawBytes>,
+    pub(crate) to_value: Vec<RawBytes>,
     pub(crate) chain_id: Vec<u64>,
 }
 
@@ -26,7 +26,7 @@ impl Dataset for StorageDiffs {
     }
 }
 
-type BlockTxsTraces = (Option<u32>, Vec<Option<Vec<u8>>>, Vec<TraceResults>);
+type BlockTxsTraces = (Option<u32>, Vec<Option<RawBytes>>, Vec<TraceResults>);
 
 #[async_trait::async_trait]
 impl CollectByBlock for StorageDiffs {
@@ -80,7 +80,7 @@ pub(crate) fn process_storage_diff(
     addr: &Address,
     diff: &std::collections::BTreeMap<B256, Delta<B256>>,
     block_number: &Option<u32>,
-    transaction_hash: &Option<Vec<u8>>,
+    transaction_hash: &Option<RawBytes>,
     transaction_index: usize,
     columns: &mut StorageDiffs,
     schema: &Table,
