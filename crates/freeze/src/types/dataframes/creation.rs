@@ -36,18 +36,3 @@ macro_rules! with_column_u256 {
         }
     };
 }
-
-/// convert a Vec<Option<U256>> to variety of u256 Column representations
-#[macro_export]
-macro_rules! with_column_option_u256 {
-    ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
-        if $schema.has_column($name) {
-            let cols = DynValues::from($value).into_columns(
-                $name.to_string(),
-                &$schema.u256_types,
-                &$schema.binary_type,
-            )?;
-            $all_columns.extend(cols);
-        }
-    };
-}

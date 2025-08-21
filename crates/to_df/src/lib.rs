@@ -106,18 +106,15 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
         .filter(|(name, _)| name != "chain_id")
         .map(|(name, ty)| {
             let macro_name = match quote!(#ty).to_string().as_str() {
-                "Vec < Vec < u8 > >" => syn::Ident::new("with_column_binary", Span::call_site()),
-                "Vec < Option < Vec < u8 > > >" => {
-                    syn::Ident::new("with_column_binary", Span::call_site())
+                "Vec < Vec < u8 > >" | "Vec < RawBytes >" => "with_column_binary",
+                "Vec < Option < Vec < u8 > > >" | "Vec < Option < RawBytes > >" => {
+                    "with_column_binary"
                 }
-                "Vec < U256 >" | "Vec < I256 >" => {
-                    syn::Ident::new("with_column_u256", Span::call_site())
-                }
-                "Vec < Option < U256 > >" | "Vec < Option < I256 > >" => {
-                    syn::Ident::new("with_column_option_u256", Span::call_site())
-                }
-                _ => syn::Ident::new("with_column", Span::call_site()),
+                "Vec < U256 >" | "Vec < I256 >" => "with_column_u256",
+                "Vec < Option < U256 > >" | "Vec < Option < I256 > >" => "with_column_u256",
+                _ => "with_column",
             };
+            let macro_name = syn::Ident::new(macro_name, Span::call_site());
             let field_name_str = quote!(#name).to_string();
             quote! {
                 #macro_name!(cols, #field_name_str, self.#name, schema);
