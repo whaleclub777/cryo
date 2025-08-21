@@ -13,6 +13,34 @@ pub trait ToU256Series {
     ) -> Result<Column, CollectError>;
 }
 
+impl ToU256Series for OptionVec<U256> {
+    fn to_u256_series(
+        &self,
+        name: String,
+        dtype: U256Type,
+        column_encoding: &ColumnEncoding,
+    ) -> Result<Column, CollectError> {
+        match self {
+            OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
+            OptionVec::Option(v) => v.to_u256_series(name, dtype, column_encoding),
+        }
+    }
+}
+
+impl ToU256Series for OptionVec<I256> {
+    fn to_u256_series(
+        &self,
+        name: String,
+        dtype: U256Type,
+        column_encoding: &ColumnEncoding,
+    ) -> Result<Column, CollectError> {
+        match self {
+            OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
+            OptionVec::Option(v) => v.to_u256_series(name, dtype, column_encoding),
+        }
+    }
+}
+
 impl ToU256Series for Vec<U256> {
     fn to_u256_series(
         &self,
