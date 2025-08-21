@@ -30,7 +30,7 @@ macro_rules! with_column_u256 {
             let cols = DynValues::from($value).into_columns(
                 $name.to_string(),
                 &$schema.u256_types,
-                &$schema.binary_type,
+                $schema.binary_type,
             )?;
             $all_columns.extend(cols);
         }

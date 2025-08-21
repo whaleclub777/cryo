@@ -9,7 +9,7 @@ pub trait ToU256Series {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Column, CollectError>;
 }
 
@@ -18,7 +18,7 @@ impl ToU256Series for OptionVec<U256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Column, CollectError> {
         match self {
             OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
@@ -32,7 +32,7 @@ impl ToU256Series for OptionVec<I256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Column, CollectError> {
         match self {
             OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
@@ -46,7 +46,7 @@ impl ToU256Series for Vec<U256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::UInt256).as_str();
         let name = PlSmallStr::from_string(name);
@@ -93,7 +93,7 @@ impl ToU256Series for Vec<Option<U256>> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::UInt256).as_str();
         let name = PlSmallStr::from_string(name);
@@ -148,7 +148,7 @@ impl ToU256Series for Vec<I256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::Int256).as_str();
         let name = PlSmallStr::from_string(name);
@@ -195,7 +195,7 @@ impl ToU256Series for Vec<Option<I256>> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::Int256).as_str();
         let name = PlSmallStr::from_string(name);

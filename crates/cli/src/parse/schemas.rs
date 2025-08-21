@@ -54,7 +54,7 @@ pub(crate) fn parse_schemas(
             datatype
                 .table_schema(
                     &u256_types,
-                    &binary_column_format,
+                    binary_column_format,
                     &args.include_columns,
                     &args.exclude_columns,
                     &args.columns,

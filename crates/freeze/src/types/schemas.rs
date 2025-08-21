@@ -84,7 +84,7 @@ pub enum U256Type {
 
 impl U256Type {
     /// convert U256Type to Columntype
-    pub fn to_columntype(&self, column_encoding: &ColumnEncoding) -> ColumnType {
+    pub fn to_columntype(&self, column_encoding: ColumnEncoding) -> ColumnType {
         match self {
             U256Type::Binary | U256Type::NamedBinary => match column_encoding {
                 ColumnEncoding::Binary => ColumnType::Binary,
@@ -178,7 +178,7 @@ impl ColumnType {
     /// Convert [`DynSolType`] to [`ColumnType`]
     pub fn from_sol_type(
         sol_type: &DynSolType,
-        binary_type: &ColumnEncoding,
+        binary_type: ColumnEncoding,
     ) -> Result<Self, SchemaError> {
         let result = match sol_type {
             DynSolType::Address => match binary_type {
@@ -236,7 +236,7 @@ impl Datatype {
     pub fn table_schema(
         &self,
         u256_types: &[U256Type],
-        binary_column_format: &ColumnEncoding,
+        binary_column_format: ColumnEncoding,
         include_columns: &Option<Vec<String>>,
         exclude_columns: &Option<Vec<String>>,
         columns: &Option<Vec<String>>,
@@ -292,7 +292,7 @@ impl Datatype {
                     ColumnType::from_sol_type(sol_type, binary_column_format)?
                 }
             };
-            if (*binary_column_format == ColumnEncoding::Hex) & (ctype == ColumnType::Binary) {
+            if (binary_column_format == ColumnEncoding::Hex) & (ctype == ColumnType::Binary) {
                 ctype = ColumnType::Hex;
             }
             columns.insert((*column.clone()).to_string(), ctype);
@@ -303,7 +303,7 @@ impl Datatype {
             sort_columns: sort,
             columns,
             u256_types: u256_types.to_owned(),
-            binary_type: binary_column_format.clone(),
+            binary_type: binary_column_format,
             log_decoder,
         };
         Ok(schema)
@@ -354,14 +354,14 @@ mod tests {
     fn test_table_schema_explicit_cols() {
         let cols = Some(vec!["block_number".to_string(), "block_hash".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(&get_u256_types(), &ColumnEncoding::Hex, &None, &None, &cols, None, None)
+            .table_schema(&get_u256_types(), ColumnEncoding::Hex, &None, &None, &cols, None, None)
             .unwrap();
         assert_eq!(vec!["block_number", "block_hash"], table.columns());
 
         // "all" marker support
         let cols = Some(vec!["all".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(&get_u256_types(), &ColumnEncoding::Hex, &None, &None, &cols, None, None)
+            .table_schema(&get_u256_types(), ColumnEncoding::Hex, &None, &None, &cols, None, None)
             .unwrap();
         assert_eq!(21, table.columns().len());
         assert!(table.columns().contains(&"block_hash"));
@@ -374,7 +374,7 @@ mod tests {
         let table = Datatype::Blocks
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &inc_cols,
                 &None,
                 &None,
@@ -390,7 +390,7 @@ mod tests {
         let table = Datatype::Blocks
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &inc_cols,
                 &None,
                 &None,
@@ -406,7 +406,7 @@ mod tests {
         let table = Datatype::Blocks
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &inc_cols,
                 &None,
                 &None,
@@ -423,7 +423,7 @@ mod tests {
     fn test_table_schema_exclude_cols() {
         // defaults
         let table = Datatype::Blocks
-            .table_schema(&get_u256_types(), &ColumnEncoding::Hex, &None, &None, &None, None, None)
+            .table_schema(&get_u256_types(), ColumnEncoding::Hex, &None, &None, &None, None, None)
             .unwrap();
         assert_eq!(8, table.columns().len());
         assert!(table.columns().contains(&"author"));
@@ -433,7 +433,7 @@ mod tests {
         let table = Datatype::Blocks
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &None,
                 &ex_cols,
                 &None,
@@ -450,7 +450,7 @@ mod tests {
         let table = Datatype::Blocks
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &None,
                 &ex_cols,
                 &None,
@@ -470,7 +470,7 @@ mod tests {
         let table = Datatype::Blocks
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &inc_cols,
                 &ex_cols,
                 &None,
@@ -489,7 +489,7 @@ mod tests {
         let table = Datatype::Logs
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &None,
                 &None,
                 &None,
@@ -518,7 +518,7 @@ mod tests {
         let table = Datatype::Logs
             .table_schema(
                 &get_u256_types(),
-                &ColumnEncoding::Hex,
+                ColumnEncoding::Hex,
                 &Some(inc_cols),
                 &Some(ex_cols),
                 &None,

@@ -200,7 +200,7 @@ fn extract_event_cols(
                     cols.extend(col_type.create_empty_columns(
                         &name,
                         &u256_types,
-                        &schema.binary_type,
+                        schema.binary_type,
                     ));
                 }
             }
@@ -215,7 +215,7 @@ fn extract_event_cols(
                     data,
                     chunk_len,
                     &u256_types,
-                    &schema.binary_type,
+                    schema.binary_type,
                 );
                 match series_vec {
                     Ok(s) => {

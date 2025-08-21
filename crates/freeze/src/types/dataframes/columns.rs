@@ -52,7 +52,7 @@ impl<T> OptionVec<T> {
         self,
         name: String,
         u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Vec<Column>, CollectError>
     where
         Vec<T>: ToU256Series,
@@ -132,7 +132,7 @@ impl_from_vec! {
 
 impl DynValues {
     /// Create a new `DynValues` instance from a vector of `DynSolValue`s.
-    pub fn from_sol_values(data: Vec<DynSolValue>, column_encoding: &ColumnEncoding) -> Self {
+    pub fn from_sol_values(data: Vec<DynSolValue>, column_encoding: ColumnEncoding) -> Self {
         // This is a smooth brain way of doing this, but I can't think of a better way right now
         let mut ints: Vec<i64> = vec![];
         let mut uints: Vec<u64> = vec![];
@@ -226,7 +226,7 @@ impl DynValues {
         self,
         name: String,
         u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Vec<Column>, CollectError> {
         match self {
             Self::Ints(ints) => Ok(vec![ints.into_column(name)]),
@@ -248,7 +248,7 @@ impl ColumnType {
         data: Vec<DynSolValue>,
         chunk_len: usize,
         u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Result<Vec<Column>, CollectError> {
         let values = DynValues::from_sol_values(data, column_encoding);
         let mixed_length_err = format!("could not parse column {name}, mixed type");
@@ -265,7 +265,7 @@ impl ColumnType {
         self,
         name: &str,
         u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Vec<Column> {
         if self.is_256() {
             return self.create_empty_u256_columns(name, u256_types, column_encoding);
@@ -278,7 +278,7 @@ impl ColumnType {
         self,
         name: &str,
         u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        column_encoding: ColumnEncoding,
     ) -> Vec<Column> {
         u256_types
             .iter()
