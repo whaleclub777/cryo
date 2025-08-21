@@ -1,5 +1,12 @@
-use alloy::{dyn_abi::DynSolValue, hex::ToHexExt, primitives::{I256, U256}};
-use polars::{prelude::{Column, NamedFrom}, series::Series};
+use alloy::{
+    dyn_abi::DynSolValue,
+    hex::ToHexExt,
+    primitives::{I256, U256},
+};
+use polars::{
+    prelude::{Column, NamedFrom},
+    series::Series,
+};
 
 use crate::{err, CollectError, ColumnEncoding, ColumnType, RawBytes, ToU256Series, U256Type};
 
@@ -33,7 +40,12 @@ impl<T> OptionVec<T> {
     }
 
     /// Convert into a variety of u256 Column representations
-    pub fn into_u256_columns(self, name: String, u256_types: &[U256Type], column_encoding: &ColumnEncoding) -> Result<Vec<Column>, CollectError>
+    pub fn into_u256_columns(
+        self,
+        name: String,
+        u256_types: &[U256Type],
+        column_encoding: &ColumnEncoding,
+    ) -> Result<Vec<Column>, CollectError>
     where
         Vec<T>: ToU256Series,
         Vec<Option<T>>: ToU256Series,
@@ -112,10 +124,7 @@ impl_from_vec! {
 
 impl DynValues {
     /// Create a new `DynValues` instance from a vector of `DynSolValue`s.
-    pub fn from_sol_values(
-        data: Vec<DynSolValue>,
-        column_encoding: &ColumnEncoding,
-    ) -> Self {
+    pub fn from_sol_values(data: Vec<DynSolValue>, column_encoding: &ColumnEncoding) -> Self {
         // This is a smooth brain way of doing this, but I can't think of a better way right now
         let mut ints: Vec<i64> = vec![];
         let mut uints: Vec<u64> = vec![];
@@ -207,30 +216,14 @@ impl DynValues {
         column_encoding: &ColumnEncoding,
     ) -> Result<Vec<Column>, CollectError> {
         match self {
-            Self::Ints(ints) => {
-                Ok(vec![ints.into_column(name)])
-            }
-            Self::UInts(uints) => {
-                Ok(vec![uints.into_column(name)])
-            }
-            Self::I256s(i256s) => {
-                i256s.into_u256_columns(name, u256_types, column_encoding)
-            }
-            Self::U256s(u256s) => {
-                u256s.into_u256_columns(name, u256_types, column_encoding)
-            }
-            Self::Bytes(bytes) => {
-                Ok(vec![bytes.into_column(name)])
-            }
-            Self::Hexes(hexes) => {
-                Ok(vec![hexes.into_column(name)])
-            }
-            Self::Bools(bools) => {
-                Ok(vec![bools.into_column(name)])
-            }
-            Self::Strings(strings) => {
-                Ok(vec![strings.into_column(name)])
-            }
+            Self::Ints(ints) => Ok(vec![ints.into_column(name)]),
+            Self::UInts(uints) => Ok(vec![uints.into_column(name)]),
+            Self::I256s(i256s) => i256s.into_u256_columns(name, u256_types, column_encoding),
+            Self::U256s(u256s) => u256s.into_u256_columns(name, u256_types, column_encoding),
+            Self::Bytes(bytes) => Ok(vec![bytes.into_column(name)]),
+            Self::Hexes(hexes) => Ok(vec![hexes.into_column(name)]),
+            Self::Bools(bools) => Ok(vec![bools.into_column(name)]),
+            Self::Strings(strings) => Ok(vec![strings.into_column(name)]),
         }
     }
 }
@@ -290,10 +283,14 @@ impl ColumnType {
             ColumnType::Boolean => Column::new(name.into(), Vec::<bool>::new()),
             ColumnType::UInt32 => Column::new(name.into(), Vec::<u32>::new()),
             ColumnType::UInt64 => Column::new(name.into(), Vec::<u64>::new()),
-            ColumnType::UInt256 => Column::new(format!("{name}_u256binary").into(), Vec::<RawBytes>::new()),
+            ColumnType::UInt256 => {
+                Column::new(format!("{name}_u256binary").into(), Vec::<RawBytes>::new())
+            }
             ColumnType::Int32 => Column::new(name.into(), Vec::<i32>::new()),
             ColumnType::Int64 => Column::new(name.into(), Vec::<i64>::new()),
-            ColumnType::Int256 => Column::new(format!("{name}_i256binary").into(), Vec::<RawBytes>::new()),
+            ColumnType::Int256 => {
+                Column::new(format!("{name}_i256binary").into(), Vec::<RawBytes>::new())
+            }
             ColumnType::Float32 => Column::new(name.into(), Vec::<f32>::new()),
             ColumnType::Float64 => Column::new(name.into(), Vec::<f64>::new()),
             ColumnType::Decimal128 => Column::new(name.into(), Vec::<RawBytes>::new()),

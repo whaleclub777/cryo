@@ -5,8 +5,8 @@ use colored::Colorize;
 use thousands::Separable;
 
 use crate::{
-    chunks::chunk_ops::ValueToString, ChunkData, ChunkStats, CollectError, Datatype,
-    Dim, ExecutionEnv, FileOutput, MetaDatatype, MultiDatatype, Partition, Query, Source, Table,
+    chunks::chunk_ops::ValueToString, ChunkData, ChunkStats, CollectError, Datatype, Dim,
+    ExecutionEnv, FileOutput, MetaDatatype, MultiDatatype, Partition, Query, Source, Table,
 };
 use std::path::PathBuf;
 

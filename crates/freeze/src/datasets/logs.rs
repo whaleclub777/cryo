@@ -213,8 +213,13 @@ fn extract_event_cols(
                 if !schema.has_column(&name) {
                     continue;
                 }
-                let series_vec =
-                    ColumnType::create_column_from_values(name, data, chunk_len, &u256_types, &schema.binary_type);
+                let series_vec = ColumnType::create_column_from_values(
+                    name,
+                    data,
+                    chunk_len,
+                    &u256_types,
+                    &schema.binary_type,
+                );
                 match series_vec {
                     Ok(s) => {
                         cols.extend(s);

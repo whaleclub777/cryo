@@ -110,7 +110,9 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
                 "Vec < Option < Vec < u8 > > >" => {
                     syn::Ident::new("with_column_binary", Span::call_site())
                 }
-                "Vec < U256 >" | "Vec < I256 >" => syn::Ident::new("with_column_u256", Span::call_site()),
+                "Vec < U256 >" | "Vec < I256 >" => {
+                    syn::Ident::new("with_column_u256", Span::call_site())
+                }
                 "Vec < Option < U256 > >" | "Vec < Option < I256 > >" => {
                     syn::Ident::new("with_column_option_u256", Span::call_site())
                 }
