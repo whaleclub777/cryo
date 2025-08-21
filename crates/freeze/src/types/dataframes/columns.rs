@@ -19,6 +19,14 @@ pub enum OptionVec<T> {
 }
 
 impl<T> OptionVec<T> {
+    /// Returns whether the vector is empty.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            OptionVec::Some(v) => v.is_empty(),
+            OptionVec::Option(v) => v.is_empty(),
+        }
+    }
+
     /// Get the length of the vector
     pub fn len(&self) -> usize {
         match self {
@@ -192,6 +200,11 @@ impl DynValues {
             // case where no data was passed
             DynValues::UInts(OptionVec::Option(vec![]))
         }
+    }
+
+    /// Returns whether the underlying data is empty.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 
     /// Returns the length of the underlying data.

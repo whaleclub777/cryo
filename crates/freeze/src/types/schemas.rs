@@ -153,10 +153,7 @@ pub enum ColumnType {
 impl ColumnType {
     /// check if column is UInt256 or Int256
     pub fn is_256(&self) -> bool {
-        match *self {
-            ColumnType::UInt256 | ColumnType::Int256 => true,
-            _ => false,
-        }
+        matches!(self, ColumnType::UInt256 | ColumnType::Int256)
     }
 
     /// convert ColumnType to str

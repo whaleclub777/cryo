@@ -196,15 +196,12 @@ fn extract_event_cols(
             for name in decoder.field_names() {
                 let name = format!("event__{name}");
                 let name = PlSmallStr::from_string(name);
-                match schema.column_type(&name) {
-                    Some(col_type) => {
-                        cols.extend(col_type.create_empty_columns(
-                            &name,
-                            &u256_types,
-                            &schema.binary_type,
-                        ));
-                    }
-                    _ => {}
+                if let Some(col_type) = schema.column_type(&name) {
+                    cols.extend(col_type.create_empty_columns(
+                        &name,
+                        &u256_types,
+                        &schema.binary_type,
+                    ));
                 }
             }
         } else {
