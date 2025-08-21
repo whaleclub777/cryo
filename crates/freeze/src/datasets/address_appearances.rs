@@ -16,9 +16,9 @@ use std::collections::HashMap;
 pub struct AddressAppearances {
     n_rows: usize,
     block_number: Vec<u32>,
-    block_hash: Vec<Vec<u8>>,
-    transaction_hash: Vec<Vec<u8>>,
-    address: Vec<Vec<u8>>,
+    block_hash: Vec<RawBytes>,
+    transaction_hash: Vec<RawBytes>,
+    address: Vec<RawBytes>,
     relationship: Vec<String>,
     chain_id: Vec<u64>,
 }

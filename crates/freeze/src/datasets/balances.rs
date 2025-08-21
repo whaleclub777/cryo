@@ -7,7 +7,7 @@ use polars::prelude::*;
 pub struct Balances {
     n_rows: usize,
     block_number: Vec<u32>,
-    address: Vec<Vec<u8>>,
+    address: Vec<RawBytes>,
     balance: Vec<U256>,
     chain_id: Vec<u64>,
 }
@@ -27,7 +27,7 @@ impl Dataset for Balances {
     }
 }
 
-type BlockTxAddressOutput = (u32, Option<Vec<u8>>, Vec<u8>, U256);
+type BlockTxAddressOutput = (u32, Option<RawBytes>, RawBytes, U256);
 
 #[async_trait::async_trait]
 impl CollectByBlock for Balances {

@@ -11,13 +11,13 @@ use polars::prelude::*;
 pub struct Erc20Approvals {
     n_rows: u64,
     block_number: Vec<u32>,
-    block_hash: Vec<Option<Vec<u8>>>,
+    block_hash: Vec<Option<RawBytes>>,
     transaction_index: Vec<u32>,
     log_index: Vec<u32>,
-    transaction_hash: Vec<Vec<u8>>,
-    erc20: Vec<Vec<u8>>,
-    from_address: Vec<Vec<u8>>,
-    to_address: Vec<Vec<u8>>,
+    transaction_hash: Vec<RawBytes>,
+    erc20: Vec<RawBytes>,
+    from_address: Vec<RawBytes>,
+    to_address: Vec<RawBytes>,
     value: Vec<U256>,
     chain_id: Vec<u64>,
 }

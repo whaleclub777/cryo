@@ -8,7 +8,7 @@ use polars::prelude::*;
 pub struct Erc721Metadata {
     n_rows: u64,
     block_number: Vec<u32>,
-    erc721: Vec<Vec<u8>>,
+    erc721: Vec<RawBytes>,
     name: Vec<Option<String>>,
     symbol: Vec<Option<String>>,
     chain_id: Vec<u64>,
@@ -30,7 +30,7 @@ impl Dataset for Erc721Metadata {
 
 #[async_trait::async_trait]
 impl CollectByBlock for Erc721Metadata {
-    type Response = (u32, Vec<u8>, Option<String>, Option<String>);
+    type Response = (u32, RawBytes, Option<String>, Option<String>);
 
     async fn extract(request: Params, source: Arc<Source>, _: Arc<Query>) -> R<Self::Response> {
         let block_number = request.ethers_block_number()?;

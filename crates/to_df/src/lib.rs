@@ -154,6 +154,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             "Vec < f64 >" => Some(quote! { ColumnType::Float64 }),
             "Vec < String >" => Some(quote! { ColumnType::String }),
             "Vec < Vec < u8 > >" => Some(quote! { ColumnType::Binary }),
+            "Vec < RawBytes >" => Some(quote! { ColumnType::Binary }),
 
             "Vec < Option < bool > >" => Some(quote! { ColumnType::Boolean }),
             "Vec < Option < u32 > >" => Some(quote! { ColumnType::UInt32 }),
@@ -166,6 +167,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             "Vec < Option < f64 > >" => Some(quote! { ColumnType::Float64 }),
             "Vec < Option < String > >" => Some(quote! { ColumnType::String }),
             "Vec < Option < Vec < u8 > > >" => Some(quote! { ColumnType::Binary }),
+            "Vec < Option < RawBytes > >" => Some(quote! { ColumnType::Binary }),
             _ => None,
             // _ => quote! {ColumnType::Binary},
         }

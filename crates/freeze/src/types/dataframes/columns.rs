@@ -1,10 +1,7 @@
 use alloy::{dyn_abi::DynSolValue, hex::ToHexExt, primitives::{I256, U256}};
 use polars::{prelude::{Column, NamedFrom}, series::Series};
 
-use crate::{err, CollectError, ColumnEncoding, ColumnType, ToU256Series, U256Type};
-
-/// alias of `Vec<u8>`
-pub type RawBytes = Vec<u8>;
+use crate::{err, CollectError, ColumnEncoding, ColumnType, RawBytes, ToU256Series, U256Type};
 
 /// A vector that can hold either values or optional values.
 pub enum OptionVec<T> {
@@ -124,7 +121,7 @@ impl DynValues {
         let mut uints: Vec<u64> = vec![];
         let mut u256s: Vec<U256> = vec![];
         let mut i256s: Vec<I256> = vec![];
-        let mut bytes: Vec<Vec<u8>> = vec![];
+        let mut bytes: Vec<RawBytes> = vec![];
         let mut hexes: Vec<String> = vec![];
         let mut bools: Vec<bool> = vec![];
         let mut strings: Vec<String> = vec![];
@@ -293,10 +290,10 @@ impl ColumnType {
             ColumnType::Boolean => Column::new(name.into(), Vec::<bool>::new()),
             ColumnType::UInt32 => Column::new(name.into(), Vec::<u32>::new()),
             ColumnType::UInt64 => Column::new(name.into(), Vec::<u64>::new()),
-            ColumnType::UInt256 => Column::new(format!("{name}_u256binary").into(), Vec::<Vec<u8>>::new()),
+            ColumnType::UInt256 => Column::new(format!("{name}_u256binary").into(), Vec::<RawBytes>::new()),
             ColumnType::Int32 => Column::new(name.into(), Vec::<i32>::new()),
             ColumnType::Int64 => Column::new(name.into(), Vec::<i64>::new()),
-            ColumnType::Int256 => Column::new(format!("{name}_i256binary").into(), Vec::<Vec<u8>>::new()),
+            ColumnType::Int256 => Column::new(format!("{name}_i256binary").into(), Vec::<RawBytes>::new()),
             ColumnType::Float32 => Column::new(name.into(), Vec::<f32>::new()),
             ColumnType::Float64 => Column::new(name.into(), Vec::<f64>::new()),
             ColumnType::Decimal128 => Column::new(name.into(), Vec::<RawBytes>::new()),

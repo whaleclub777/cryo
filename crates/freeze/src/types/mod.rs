@@ -50,7 +50,7 @@ pub mod schemas;
 pub mod summaries;
 
 pub use chunks::{
-    AddressChunk, BlockChunk, CallDataChunk, Chunk, ChunkData, ChunkStats, SlotChunk, Subchunk,
+    AddressChunk, BlockChunk, CallDataChunk, Chunk, ChunkData, ChunkStats, RawBytes, SlotChunk, Subchunk,
     TopicChunk, TransactionChunk,
 };
 pub use conversions::{bytes_to_u32, ToVecHex, ToVecU8};

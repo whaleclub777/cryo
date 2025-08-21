@@ -12,8 +12,8 @@ pub struct BalanceReads {
     pub(crate) n_rows: u64,
     pub(crate) block_number: Vec<Option<u32>>,
     pub(crate) transaction_index: Vec<Option<u32>>,
-    pub(crate) transaction_hash: Vec<Option<Vec<u8>>>,
-    pub(crate) address: Vec<Vec<u8>>,
+    pub(crate) transaction_hash: Vec<Option<RawBytes>>,
+    pub(crate) address: Vec<RawBytes>,
     pub(crate) balance: Vec<U256>,
     pub(crate) chain_id: Vec<u64>,
 }
@@ -21,7 +21,7 @@ pub struct BalanceReads {
 #[async_trait::async_trait]
 impl Dataset for BalanceReads {}
 
-type BlockTxsTraces = (Option<u32>, Vec<Option<Vec<u8>>>, Vec<BTreeMap<Address, AccountState>>);
+type BlockTxsTraces = (Option<u32>, Vec<Option<RawBytes>>, Vec<BTreeMap<Address, AccountState>>);
 
 #[async_trait::async_trait]
 impl CollectByBlock for BalanceReads {
@@ -75,7 +75,7 @@ pub(crate) fn process_balance_read(
     addr: &Address,
     account_state: &AccountState,
     block_number: &Option<u32>,
-    transaction_hash: &Option<Vec<u8>>,
+    transaction_hash: &Option<RawBytes>,
     transaction_index: usize,
     columns: &mut BalanceReads,
     schema: &Table,

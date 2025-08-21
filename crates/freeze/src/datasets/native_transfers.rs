@@ -10,12 +10,12 @@ use polars::prelude::*;
 pub struct NativeTransfers {
     n_rows: u64,
     block_number: Vec<u32>,
-    block_hash: Vec<Vec<u8>>,
+    block_hash: Vec<RawBytes>,
     transaction_index: Vec<Option<u32>>,
     transfer_index: Vec<u32>,
-    transaction_hash: Vec<Option<Vec<u8>>>,
-    from_address: Vec<Vec<u8>>,
-    to_address: Vec<Vec<u8>>,
+    transaction_hash: Vec<Option<RawBytes>>,
+    from_address: Vec<RawBytes>,
+    to_address: Vec<RawBytes>,
     value: Vec<U256>,
     chain_id: Vec<u64>,
 }
