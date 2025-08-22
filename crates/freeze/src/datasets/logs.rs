@@ -188,7 +188,7 @@ fn extract_event_cols(
     values: indexmap::IndexMap<String, Vec<DynSolValue>>,
     chunk_len: usize,
     schema: &Table,
-) {
+) -> Result<(), CollectError> {
     if let Some(decoder) = &schema.log_decoder {
         // Write columns even if there are no values decoded - indicates empty dataframe
         if values.is_empty() {
@@ -204,17 +204,11 @@ fn extract_event_cols(
                 let name = format!("event__{name}");
                 if let Some(col_type) = schema.column_type(&name) {
                     let series_vec =
-                        col_type.create_column_from_values(name, data, chunk_len, &schema.config);
-                    match series_vec {
-                        Ok(s) => {
-                            cols.extend(s);
-                        }
-                        Err(e) => eprintln!("error creating frame: {e}"), /* TODO: see how best
-                                                                           * to
-                                                                           * bubble up error */
-                    }
+                        col_type.create_column_from_values(name, data, chunk_len, &schema.config)?;
+                    cols.extend(series_vec);
                 }
             }
         }
     }
+    Ok(())
 }

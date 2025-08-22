@@ -93,6 +93,7 @@ impl ColumnType {
 
 #[cfg(test)]
 mod tests {
+    use alloy::primitives::{I256, U256};
     use polars::prelude::DataType;
 
     use crate::{ColumnEncoding, U256Type};
@@ -231,5 +232,41 @@ mod tests {
         assert_eq!(cols.len(), 1);
         assert_eq!(cols[0].dtype(), &DataType::String);
         assert_eq!(cols[0].len(), 3);
+
+        let cols = DynValues::from(vec![U256::from(1), U256::from(2), U256::from(3)])
+            .into_columns("UInt256".to_string(), ColumnType::UInt256, &get_config())
+            .unwrap();
+        assert_eq!(cols.len(), 3);
+        assert_eq!(
+            cols.iter().map(|c| c.dtype().clone()).collect::<Vec<_>>(),
+            vec![DataType::Binary, DataType::String, DataType::Float64]
+        );
+        assert_eq!(
+            cols.iter().map(|c| c.name().to_string()).collect::<Vec<_>>(),
+            vec![
+                "UInt256_u256binary".to_string(),
+                "UInt256_string".to_string(),
+                "UInt256_f64".to_string()
+            ]
+        );
+        assert!(cols.iter().all(|c| c.len() == 3));
+
+        let cols = DynValues::from(vec![I256::try_from(-1).unwrap(), I256::try_from(0).unwrap(), I256::try_from(1).unwrap()])
+            .into_columns("Int256".to_string(), ColumnType::Int256, &get_config())
+            .unwrap();
+        assert_eq!(cols.len(), 3);
+        assert_eq!(
+            cols.iter().map(|c| c.dtype().clone()).collect::<Vec<_>>(),
+            vec![DataType::Binary, DataType::String, DataType::Float64]
+        );
+        assert_eq!(
+            cols.iter().map(|c| c.name().to_string()).collect::<Vec<_>>(),
+            vec![
+                "Int256_i256binary".to_string(),
+                "Int256_string".to_string(),
+                "Int256_f64".to_string()
+            ]
+        );
+        assert!(cols.iter().all(|c| c.len() == 3));
     }
 }

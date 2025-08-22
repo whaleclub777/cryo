@@ -299,7 +299,7 @@ impl DynValues {
                 _ => Err(err(&mixed_type_err)),
             },
             Self::U256s(u256s) => match col_type {
-                ColumnType::Int256 => u256s.into_u256_columns(name, config),
+                ColumnType::UInt256 => u256s.into_u256_columns(name, config),
                 ColumnType::Float32 => {
                     Ok(vec![u256s.to_u256_series(name, U256Type::F32, config)?])
                 }

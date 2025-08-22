@@ -133,7 +133,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             let field_name_str = field_name.to_string();
             flatten_field = Some(field_name_str.clone());
             quote! {
-                #expr(&mut cols, #field_name_str, self.#field_name, self.n_rows as usize, schema);
+                #expr(&mut cols, #field_name_str, self.#field_name, self.n_rows as usize, schema)?;
             }
         });
 
