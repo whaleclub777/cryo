@@ -78,6 +78,10 @@ pub struct Args {
     #[arg(long, help_heading = "Content Options")]
     pub hex: bool,
 
+    /// Use hex string encoding without a prefix for binary columns
+    #[arg(long, help_heading = "Content Options")]
+    pub no_hex_prefix: bool,
+
     /// Columns(s) to sort by, `none` for unordered
     #[arg(short, long, num_args(0..), help_heading="Content Options")]
     pub sort: Option<Vec<String>>,

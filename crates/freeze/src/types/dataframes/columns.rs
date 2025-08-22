@@ -8,7 +8,9 @@ use polars::{
     series::Series,
 };
 
-use crate::{err, CollectError, ColumnEncoding, ColumnType, RawBytes, ToU256Series, U256Type};
+use crate::{
+    err, schemas::TableConfig, CollectError, ColumnEncoding, ColumnType, RawBytes, ToU256Series,
+};
 
 /// A vector that can hold either values or optional values.
 pub enum OptionVec<T> {
@@ -51,8 +53,7 @@ impl<T> OptionVec<T> {
     pub fn into_u256_columns(
         self,
         name: String,
-        u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Vec<Column>, CollectError>
     where
         Vec<T>: ToU256Series,
@@ -61,22 +62,22 @@ impl<T> OptionVec<T> {
         match self {
             OptionVec::Some(v) => {
                 let mut series_vec = Vec::new();
-                for u256_type in u256_types.iter() {
+                for u256_type in config.u256_types.iter() {
                     series_vec.push(v.to_u256_series(
                         name.to_string(),
                         u256_type.clone(),
-                        column_encoding,
+                        config,
                     )?)
                 }
                 Ok(series_vec)
             }
             OptionVec::Option(v) => {
                 let mut series_vec = Vec::new();
-                for u256_type in u256_types.iter() {
+                for u256_type in config.u256_types.iter() {
                     series_vec.push(v.to_u256_series(
                         name.to_string(),
                         u256_type.clone(),
-                        column_encoding,
+                        config,
                     )?)
                 }
                 Ok(series_vec)
@@ -132,7 +133,7 @@ impl_from_vec! {
 
 impl DynValues {
     /// Create a new `DynValues` instance from a vector of `DynSolValue`s.
-    pub fn from_sol_values(data: Vec<DynSolValue>, column_encoding: &ColumnEncoding) -> Self {
+    pub fn from_sol_values(data: Vec<DynSolValue>, config: &TableConfig) -> Self {
         // This is a smooth brain way of doing this, but I can't think of a better way right now
         let mut ints: Vec<i64> = vec![];
         let mut uints: Vec<u64> = vec![];
@@ -146,17 +147,17 @@ impl DynValues {
 
         for token in data {
             match token {
-                DynSolValue::Address(a) => match column_encoding {
+                DynSolValue::Address(a) => match config.binary_type {
                     ColumnEncoding::Binary => bytes.push(a.to_vec()),
-                    ColumnEncoding::Hex => hexes.push(format!("{a:?}")),
+                    ColumnEncoding::Hex => hexes.push(to_hex(a, config.hex_prefix)),
                 },
-                DynSolValue::FixedBytes(b, _) => match column_encoding {
+                DynSolValue::FixedBytes(b, _) => match config.binary_type {
                     ColumnEncoding::Binary => bytes.push(b.to_vec()),
-                    ColumnEncoding::Hex => hexes.push(b.encode_hex()),
+                    ColumnEncoding::Hex => hexes.push(to_hex(b, config.hex_prefix)),
                 },
-                DynSolValue::Bytes(b) => match column_encoding {
+                DynSolValue::Bytes(b) => match config.binary_type {
                     ColumnEncoding::Binary => bytes.push(b),
-                    ColumnEncoding::Hex => hexes.push(b.encode_hex()),
+                    ColumnEncoding::Hex => hexes.push(to_hex(b, config.hex_prefix)),
                 },
                 DynSolValue::Uint(i, size) => {
                     if size <= 64 {
@@ -225,15 +226,17 @@ impl DynValues {
     pub fn into_columns(
         self,
         name: String,
-        u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Vec<Column>, CollectError> {
         match self {
             Self::Ints(ints) => Ok(vec![ints.into_column(name)]),
             Self::UInts(uints) => Ok(vec![uints.into_column(name)]),
-            Self::I256s(i256s) => i256s.into_u256_columns(name, u256_types, column_encoding),
-            Self::U256s(u256s) => u256s.into_u256_columns(name, u256_types, column_encoding),
-            Self::Bytes(bytes) => Ok(vec![bytes.into_column(name)]),
+            Self::I256s(i256s) => i256s.into_u256_columns(name, config),
+            Self::U256s(u256s) => u256s.into_u256_columns(name, config),
+            Self::Bytes(bytes) => match config.binary_type {
+                ColumnEncoding::Binary => Ok(vec![bytes.into_column(name)]),
+                ColumnEncoding::Hex => Ok(vec![bytes.into_column(name)]),
+            },
             Self::Hexes(hexes) => Ok(vec![hexes.into_column(name)]),
             Self::Bools(bools) => Ok(vec![bools.into_column(name)]),
             Self::Strings(strings) => Ok(vec![strings.into_column(name)]),
@@ -247,43 +250,33 @@ impl ColumnType {
         name: String,
         data: Vec<DynSolValue>,
         chunk_len: usize,
-        u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Vec<Column>, CollectError> {
-        let values = DynValues::from_sol_values(data, column_encoding);
+        let values = DynValues::from_sol_values(data, config);
         let mixed_length_err = format!("could not parse column {name}, mixed type");
         let mixed_length_err = mixed_length_err.as_str();
 
         if values.len() != chunk_len {
             return Err(err(mixed_length_err))
         }
-        values.into_columns(name, u256_types, column_encoding)
+        values.into_columns(name, config)
     }
 
     /// data should never be mixed type, otherwise this will return inconsistent results
-    pub fn create_empty_columns(
-        self,
-        name: &str,
-        u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
-    ) -> Vec<Column> {
+    pub fn create_empty_columns(self, name: &str, config: &TableConfig) -> Vec<Column> {
         if self.is_256() {
-            return self.create_empty_u256_columns(name, u256_types, column_encoding);
+            return self.create_empty_u256_columns(name, config);
         }
         vec![self.create_single_empty_column(name)]
     }
 
     /// Create empty columns for U256 types
-    pub fn create_empty_u256_columns(
-        self,
-        name: &str,
-        u256_types: &[U256Type],
-        column_encoding: &ColumnEncoding,
-    ) -> Vec<Column> {
-        u256_types
+    pub fn create_empty_u256_columns(self, name: &str, config: &TableConfig) -> Vec<Column> {
+        config
+            .u256_types
             .iter()
             .map(|u256_type| {
-                let new_type = u256_type.to_columntype(column_encoding);
+                let new_type = u256_type.to_columntype(config.binary_type);
                 let full_name = name.to_string() + u256_type.suffix(self).as_str();
                 new_type.create_single_empty_column(&full_name)
             })
@@ -311,5 +304,13 @@ impl ColumnType {
             ColumnType::Binary => Column::new(name.into(), Vec::<RawBytes>::new()),
             ColumnType::Hex => Column::new(name.into(), Vec::<String>::new()),
         }
+    }
+}
+
+fn to_hex<T: ToHexExt>(value: T, with_prefix: bool) -> String {
+    if with_prefix {
+        value.encode_hex_with_prefix()
+    } else {
+        value.encode_hex()
     }
 }

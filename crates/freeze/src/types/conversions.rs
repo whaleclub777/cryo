@@ -1,7 +1,6 @@
-use crate::CollectError;
+use crate::{CollectError, OptionVec, RawBytes};
 /// conversion operations
 use alloy::primitives::{Bytes, I256, U256};
-use prefix_hex;
 
 /// convert Bytes to u32
 pub fn bytes_to_u32(value: Bytes) -> Result<u32, CollectError> {
@@ -63,21 +62,40 @@ pub trait ToVecHex {
     type Output;
 
     /// Convert to Vec of hex String
-    fn to_vec_hex(&self) -> Self::Output;
+    fn to_vec_hex(&self, with_prefix: bool) -> Self::Output;
 }
 
-impl ToVecHex for Vec<Vec<u8>> {
-    type Output = Vec<String>;
-
-    fn to_vec_hex(&self) -> Self::Output {
-        self.iter().map(|v| prefix_hex::encode(v.clone())).collect()
+fn encode_hex<T: AsRef<[u8]>>(data: T, with_prefix: bool) -> String {
+    if with_prefix {
+        alloy::hex::encode_prefixed(data)
+    } else {
+        alloy::hex::encode(data)
     }
 }
 
-impl ToVecHex for Vec<Option<Vec<u8>>> {
+impl ToVecHex for Vec<RawBytes> {
+    type Output = Vec<String>;
+
+    fn to_vec_hex(&self, with_prefix: bool) -> Self::Output {
+        self.iter().map(|v| encode_hex(v, with_prefix)).collect()
+    }
+}
+
+impl ToVecHex for Vec<Option<RawBytes>> {
     type Output = Vec<Option<String>>;
 
-    fn to_vec_hex(&self) -> Self::Output {
-        self.iter().map(|opt| opt.as_ref().map(|v| prefix_hex::encode(v.clone()))).collect()
+    fn to_vec_hex(&self, with_prefix: bool) -> Self::Output {
+        self.iter().map(|opt| opt.as_ref().map(|v| encode_hex(v, with_prefix))).collect()
+    }
+}
+
+impl ToVecHex for OptionVec<RawBytes> {
+    type Output = OptionVec<String>;
+
+    fn to_vec_hex(&self, with_prefix: bool) -> Self::Output {
+        match self {
+            OptionVec::Some(v) => OptionVec::Some(v.to_vec_hex(with_prefix)),
+            OptionVec::Option(v) => OptionVec::Option(v.to_vec_hex(with_prefix)),
+        }
     }
 }

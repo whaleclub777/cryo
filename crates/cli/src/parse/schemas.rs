@@ -38,6 +38,11 @@ pub(crate) fn parse_schemas(
         true => ColumnEncoding::Hex,
         false => ColumnEncoding::Binary,
     };
+    let table_config = cryo_freeze::TableConfig {
+        binary_type: binary_column_format,
+        u256_types: u256_types.clone(),
+        hex_prefix: !args.no_hex_prefix,
+    };
 
     let log_decoder = match args.event_signature {
         Some(ref sig) => match LogDecoder::new(sig.clone()) {
@@ -53,8 +58,7 @@ pub(crate) fn parse_schemas(
         .map(|datatype| {
             datatype
                 .table_schema(
-                    &u256_types,
-                    &binary_column_format,
+                    table_config.clone(),
                     &args.include_columns,
                     &args.exclude_columns,
                     &args.columns,

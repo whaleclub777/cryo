@@ -189,7 +189,6 @@ fn extract_event_cols(
     chunk_len: usize,
     schema: &Table,
 ) {
-    let u256_types: Vec<_> = schema.u256_types.clone().into_iter().collect();
     if let Some(decoder) = &schema.log_decoder {
         // Write columns even if there are no values decoded - indicates empty dataframe
         if values.is_empty() {
@@ -197,11 +196,7 @@ fn extract_event_cols(
                 let name = format!("event__{name}");
                 let name = PlSmallStr::from_string(name);
                 if let Some(col_type) = schema.column_type(&name) {
-                    cols.extend(col_type.create_empty_columns(
-                        &name,
-                        &u256_types,
-                        &schema.binary_type,
-                    ));
+                    cols.extend(col_type.create_empty_columns(&name, &schema.config));
                 }
             }
         } else {
@@ -210,13 +205,8 @@ fn extract_event_cols(
                 if !schema.has_column(&name) {
                     continue;
                 }
-                let series_vec = ColumnType::create_column_from_values(
-                    name,
-                    data,
-                    chunk_len,
-                    &u256_types,
-                    &schema.binary_type,
-                );
+                let series_vec =
+                    ColumnType::create_column_from_values(name, data, chunk_len, &schema.config);
                 match series_vec {
                     Ok(s) => {
                         cols.extend(s);
