@@ -40,8 +40,8 @@ pub(crate) fn parse_schemas(
     };
     let table_config = cryo_freeze::TableConfig {
         binary_type: binary_column_format,
-        hex_prefix: true,
         u256_types: u256_types.clone(),
+        hex_prefix: !args.no_hex_prefix,
     };
 
     let log_decoder = match args.event_signature {
