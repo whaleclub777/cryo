@@ -54,9 +54,7 @@ impl ToDataFramesMetaParams {
 /// #     #[macro_export]
 /// #     macro_rules! with_column_impl { ($cols:expr, $name:expr, $value:expr, $schema:expr) => {let _: Vec<Column> = $cols;}; }
 /// #     pub use with_column_impl as with_column;
-/// #     pub use with_column_impl as with_column_binary;
-/// #     pub use with_column_impl as with_column_u256;
-/// #     pub use with_column_impl as with_column_option_u256;
+/// #     pub use with_column_impl as with_column_primitive;
 /// #     pub trait ColumnData {
 /// #         fn column_types() -> indexmap::IndexMap<&'static str, ColumnType>;
 /// #     }
@@ -83,7 +81,7 @@ impl ToDataFramesMetaParams {
 ///     values: indexmap::IndexMap<String, Vec<DynSolValue>>,
 ///     n_rows: usize,
 ///     schema: &Table,
-/// ) {
+/// ) -> Result<(), CollectError> {
 ///     todo!()
 /// }
 /// ```
@@ -106,12 +104,9 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
         .filter(|(name, _)| name != "chain_id")
         .map(|(name, ty)| {
             let macro_name = match quote!(#ty).to_string().as_str() {
-                "Vec < Vec < u8 > >" | "Vec < RawBytes >" => "with_column_binary",
-                "Vec < Option < Vec < u8 > > >" | "Vec < Option < RawBytes > >" => {
-                    "with_column_binary"
-                }
-                "Vec < U256 >" | "Vec < I256 >" => "with_column_u256",
-                "Vec < Option < U256 > >" | "Vec < Option < I256 > >" => "with_column_u256",
+                "Vec < u32 >" | "Vec < u64 >" => "with_column_primitive",
+                "Vec < i32 >" | "Vec < i64 >" => "with_column_primitive",
+                "Vec < f32 >" | "Vec < f64 >" => "with_column_primitive",
                 _ => "with_column",
             };
             let macro_name = syn::Ident::new(macro_name, Span::call_site());
@@ -136,7 +131,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
             let field_name_str = field_name.to_string();
             flatten_field = Some(field_name_str.clone());
             quote! {
-                #expr(&mut cols, #field_name_str, self.#field_name, self.n_rows as usize, schema);
+                #expr(&mut cols, #field_name_str, self.#field_name, self.n_rows as usize, schema)?;
             }
         });
 

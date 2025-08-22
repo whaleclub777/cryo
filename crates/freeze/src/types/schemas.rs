@@ -145,7 +145,7 @@ pub enum ColumnType {
     Int32,
     /// Int64 column type
     Int64,
-    /// U256 column type
+    /// I256 column type
     Int256,
     /// Float32 column type
     Float32,
@@ -192,14 +192,12 @@ impl ColumnType {
         binary_type: ColumnEncoding,
     ) -> Result<Self, SchemaError> {
         let result = match sol_type {
-            DynSolType::Address => match binary_type {
-                ColumnEncoding::Binary => ColumnType::Binary,
-                ColumnEncoding::Hex => ColumnType::Hex,
-            },
-            DynSolType::Bytes => match binary_type {
-                ColumnEncoding::Binary => ColumnType::Binary,
-                ColumnEncoding::Hex => ColumnType::Hex,
-            },
+            DynSolType::Address | DynSolType::Bytes | DynSolType::FixedBytes(_) => {
+                match binary_type {
+                    ColumnEncoding::Binary => ColumnType::Binary,
+                    ColumnEncoding::Hex => ColumnType::Hex,
+                }
+            }
             DynSolType::Int(bits) => {
                 if *bits <= 64 {
                     ColumnType::Int64
@@ -217,7 +215,6 @@ impl ColumnType {
             DynSolType::Bool => ColumnType::Boolean,
             DynSolType::String => ColumnType::String,
             DynSolType::Array(_) => return Err(SchemaError::InvalidSolType("Array")),
-            DynSolType::FixedBytes(_) => return Err(SchemaError::InvalidSolType("FixedBytes")),
             DynSolType::FixedArray(_, _) => return Err(SchemaError::InvalidSolType("FixedArray")),
             DynSolType::Tuple(_) => return Err(SchemaError::InvalidSolType("Tuple")),
             DynSolType::Function => return Err(SchemaError::InvalidSolType("Function")),
