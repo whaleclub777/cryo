@@ -107,8 +107,6 @@ pub enum DynValues {
     I256s(OptionVec<I256>),
     /// bytes
     Bytes(OptionVec<RawBytes>),
-    /// hex
-    Hexes(OptionVec<String>),
     /// bool
     Bools(OptionVec<bool>),
     /// string
@@ -141,6 +139,19 @@ impl_from_vec! {
 }
 
 impl DynValues {
+    /// Returns the data type as a string.
+    pub fn dtype_str(&self) -> &'static str {
+        match self {
+            DynValues::Ints(_) => "Int64",
+            DynValues::UInts(_) => "UInt64",
+            DynValues::U256s(_) => "UInt256",
+            DynValues::I256s(_) => "Int256",
+            DynValues::Bytes(_) => "Binary",
+            DynValues::Bools(_) => "Boolean",
+            DynValues::Strings(_) => "String",
+        }
+    }
+
     /// Create a new `DynValues` instance from a vector of `DynSolValue`s.
     pub fn from_sol_values(
         data: Vec<DynSolValue>,
@@ -222,7 +233,6 @@ impl DynValues {
             DynValues::U256s(u256s) => u256s.len(),
             DynValues::UInts(uints) => uints.len(),
             DynValues::Bytes(bytes) => bytes.len(),
-            DynValues::Hexes(hexes) => hexes.len(),
             DynValues::Bools(bools) => bools.len(),
             DynValues::Strings(strings) => strings.len(),
         }
@@ -235,7 +245,7 @@ impl DynValues {
         col_type: ColumnType,
         config: &TableConfig,
     ) -> Result<Vec<Column>, CollectError> {
-        let mixed_type_err = format!("could not parse column {name}, mixed type {col_type:?}");
+        let mixed_type_err = format!("could not parse column {name}, mixed type expect {col_type:?}, actually {}", self.dtype_str());
         match self {
             Self::Ints(ints) => match col_type {
                 ColumnType::Int256 => {
@@ -262,7 +272,6 @@ impl DynValues {
                 ColumnType::Hex => Ok(vec![bytes.to_vec_hex(config.hex_prefix).into_column(name)]),
                 _ => Err(err(&mixed_type_err)),
             },
-            Self::Hexes(hexes) => Ok(vec![hexes.into_column(name)]),
             Self::Bools(bools) => Ok(vec![bools.into_column(name)]),
             Self::Strings(strings) => Ok(vec![strings.into_column(name)]),
             _ => Err(err(&mixed_type_err)),
@@ -330,5 +339,109 @@ impl ColumnType {
             ColumnType::Binary => Column::new(name.into(), Vec::<RawBytes>::new()),
             ColumnType::Hex => Column::new(name.into(), Vec::<String>::new()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use polars::prelude::DataType;
+
+    use crate::{ColumnEncoding, U256Type};
+
+    use super::*;
+
+    fn get_config() -> TableConfig {
+        TableConfig {
+            hex_prefix: true,
+            binary_type: ColumnEncoding::Binary,
+            u256_types: vec![U256Type::NamedBinary, U256Type::String, U256Type::F64],
+        }
+    }
+
+    macro_rules! test_empty_column {
+        ($($ty:ident)+) => {
+            $({
+                let cols = ColumnType::$ty
+                    .create_empty_columns(stringify!($ty), &get_config());
+                assert_eq!(cols.len(), 1);
+                assert_eq!(cols[0].dtype(), &DataType::$ty);
+                assert_eq!(cols[0].len(), 0);
+            })+
+        };
+    }
+
+    macro_rules! test_column {
+        ($($ty:ident => $exp:expr,)+) => {
+            $({
+                let len = $exp.len();
+                let cols = ColumnType::$ty
+                    .create_column_from_values(stringify!($ty).to_string(), $exp.clone().into_iter().map(|i| i.into()).collect(), len, &get_config())
+                    .unwrap();
+                assert_eq!(cols.len(), 1);
+                assert_eq!(cols[0].dtype(), &DataType::$ty);
+                assert_eq!(cols[0].len(), len);
+            })+
+        };
+    }
+
+    #[test]
+    fn test_empty_column_creation() {
+        test_empty_column!(Boolean UInt32 UInt64 Int32 Int64 Float32 Float64 String Binary);
+        let cols = ColumnType::Hex.create_empty_columns("Hex", &get_config());
+        assert_eq!(cols.len(), 1);
+        assert_eq!(cols[0].dtype(), &DataType::String);
+        assert_eq!(cols[0].len(), 0);
+
+        let cols = ColumnType::Decimal128.create_empty_columns("Decimal128", &get_config());
+        assert_eq!(cols.len(), 1);
+        assert_eq!(cols[0].dtype(), &DataType::Binary);
+        assert_eq!(cols[0].len(), 0);
+
+        let cols = ColumnType::UInt256.create_empty_columns("UInt256", &get_config());
+        assert_eq!(cols.len(), 3);
+        assert_eq!(
+            cols.iter().map(|c| c.dtype().clone()).collect::<Vec<_>>(),
+            vec![DataType::Binary, DataType::String, DataType::Float64]
+        );
+        assert_eq!(
+            cols.iter().map(|c| c.name().to_string()).collect::<Vec<_>>(),
+            vec![
+                "UInt256_u256binary".to_string(),
+                "UInt256_string".to_string(),
+                "UInt256_f64".to_string()
+            ]
+        );
+        assert!(cols.iter().all(|c| c.len() == 0));
+
+        let cols = ColumnType::Int256.create_empty_columns("Int256", &get_config());
+        assert_eq!(cols.len(), 3);
+        assert_eq!(
+            cols.iter().map(|c| c.dtype().clone()).collect::<Vec<_>>(),
+            vec![DataType::Binary, DataType::String, DataType::Float64]
+        );
+        assert_eq!(
+            cols.iter().map(|c| c.name().to_string()).collect::<Vec<_>>(),
+            vec![
+                "Int256_i256binary".to_string(),
+                "Int256_string".to_string(),
+                "Int256_f64".to_string()
+            ]
+        );
+        assert!(cols.iter().all(|c| c.len() == 0));
+    }
+
+    #[test]
+    fn test_column_creation() {
+        test_column!(
+            Boolean => vec![true, false, true],
+            UInt32 => vec![1u32, 2, 3],
+            UInt64 => vec![1u64, 2, 3],
+            Int32 => vec![-1i32, 0, 1],
+            Int64 => vec![-1i64, 0, 1],
+            // Float32 => vec![1.0, 2.0, 3.0],
+            // Float64 => vec![1.0, 2.0, 3.0],
+            String => vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            Binary => vec![vec![1, 2], vec![3, 4], vec![5, 6]],
+        );
     }
 }
