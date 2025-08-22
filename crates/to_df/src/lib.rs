@@ -1,7 +1,6 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use proc_macro2::Span;
 use quote::quote;
 use syn::{parse_macro_input, parse_str, ItemStruct};
 
@@ -104,20 +103,10 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
         .filter(|(name, _)| quote!(#name).to_string() != "n_rows")
         .filter(|(_, value)| quote!(#value).to_string().starts_with("Vec"))
         .filter(|(name, _)| name != "chain_id")
-        .map(|(name, ty)| {
-            let macro_name = match quote!(#ty).to_string().as_str() {
-                "Vec < Vec < u8 > >" | "Vec < RawBytes >" => "with_column_binary",
-                "Vec < Option < Vec < u8 > > >" | "Vec < Option < RawBytes > >" => {
-                    "with_column_binary"
-                }
-                "Vec < U256 >" | "Vec < I256 >" => "with_column_u256",
-                "Vec < Option < U256 > >" | "Vec < Option < I256 > >" => "with_column_u256",
-                _ => "with_column",
-            };
-            let macro_name = syn::Ident::new(macro_name, Span::call_site());
+        .map(|(name, _)| {
             let field_name_str = quote!(#name).to_string();
             quote! {
-                #macro_name!(cols, #field_name_str, self.#name, schema);
+                with_column!(cols, #field_name_str, self.#name, schema);
             }
         })
         .collect();

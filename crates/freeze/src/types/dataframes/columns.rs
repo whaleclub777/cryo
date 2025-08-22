@@ -8,7 +8,7 @@ use polars::{
 };
 
 use crate::{
-    err, schemas::TableConfig, CollectError, ColumnType, RawBytes, ToU256Series, ToVecHex,
+    err, CollectError, ColumnType, RawBytes, TableConfig, ToU256Series, ToVecHex, U256Type,
 };
 
 /// A vector that can hold either values or optional values.
@@ -105,6 +105,8 @@ pub enum DynValues {
     U256s(OptionVec<U256>),
     /// i256
     I256s(OptionVec<I256>),
+    /// f64
+    F64s(OptionVec<f64>),
     /// bytes
     Bytes(OptionVec<RawBytes>),
     /// bool
@@ -114,7 +116,7 @@ pub enum DynValues {
 }
 
 macro_rules! impl_from_vec {
-    ($($ty:ty => $variant:ident,)+) => {
+    ($($ty:ty $(, $ty2:ty)* => $variant:ident,)+) => {
         $(impl From<Vec<$ty>> for DynValues {
             fn from(value: Vec<$ty>) -> Self {
                 DynValues::$variant(OptionVec::Some(value))
@@ -124,15 +126,28 @@ macro_rules! impl_from_vec {
             fn from(value: Vec<Option<$ty>>) -> Self {
                 DynValues::$variant(OptionVec::Option(value))
             }
-        })+
+        }
+
+        $(impl From<Vec<$ty2>> for DynValues {
+            fn from(value: Vec<$ty2>) -> Self {
+                DynValues::$variant(OptionVec::Some(value).map(|v| v.into()))
+            }
+        }
+        impl From<Vec<Option<$ty2>>> for DynValues {
+            fn from(value: Vec<Option<$ty2>>) -> Self {
+                DynValues::$variant(OptionVec::Option(value).map(|v| v.into()))
+            }
+        })*
+        )+
     };
 }
 
 impl_from_vec! {
-    i64 => Ints,
-    u64 => UInts,
+    i64, i32 => Ints,
+    u64, u32 => UInts,
     U256 => U256s,
     I256 => I256s,
+    f64, f32 => F64s,
     RawBytes => Bytes,
     String => Strings,
     bool => Bools,
@@ -146,6 +161,7 @@ impl DynValues {
             DynValues::UInts(_) => "UInt64",
             DynValues::U256s(_) => "UInt256",
             DynValues::I256s(_) => "Int256",
+            DynValues::F64s(_) => "Float64",
             DynValues::Bytes(_) => "Binary",
             DynValues::Bools(_) => "Boolean",
             DynValues::Strings(_) => "String",
@@ -232,6 +248,7 @@ impl DynValues {
             DynValues::I256s(i256s) => i256s.len(),
             DynValues::U256s(u256s) => u256s.len(),
             DynValues::UInts(uints) => uints.len(),
+            DynValues::F64s(f64s) => f64s.len(),
             DynValues::Bytes(bytes) => bytes.len(),
             DynValues::Bools(bools) => bools.len(),
             DynValues::Strings(strings) => strings.len(),
@@ -256,20 +273,49 @@ impl DynValues {
                 }
                 ColumnType::Int32 => Ok(vec![ints.map(|v| v as i32).into_column(name)]),
                 ColumnType::Int64 => Ok(vec![ints.into_column(name)]),
+                ColumnType::Float32 => Ok(vec![ints.map(|v| v as f32).into_column(name)]),
+                ColumnType::Float64 => Ok(vec![ints.map(|v| v as f64).into_column(name)]),
                 _ => Err(err(&mixed_type_err)),
             },
             Self::UInts(uints) => match col_type {
                 ColumnType::UInt256 => uints.map(|v| U256::from(v)).into_u256_columns(name, config),
                 ColumnType::UInt32 => Ok(vec![uints.map(|v| v as u32).into_column(name)]),
                 ColumnType::UInt64 => Ok(vec![uints.into_column(name)]),
+                ColumnType::Float32 => Ok(vec![uints.map(|v| v as f32).into_column(name)]),
+                ColumnType::Float64 => Ok(vec![uints.map(|v| v as f64).into_column(name)]),
                 _ => Err(err(&mixed_type_err)),
             },
-            Self::I256s(i256s) if col_type == ColumnType::Int256 => {
-                i256s.into_u256_columns(name, config)
-            }
-            Self::U256s(u256s) if col_type == ColumnType::UInt256 => {
-                u256s.into_u256_columns(name, config)
-            }
+            Self::I256s(i256s) => match col_type {
+                ColumnType::Int256 => i256s.into_u256_columns(name, config),
+                ColumnType::Float32 => {
+                    Ok(vec![i256s.to_u256_series(name, U256Type::F32, config)?])
+                }
+                ColumnType::Float64 => {
+                    Ok(vec![i256s.to_u256_series(name, U256Type::F64, config)?])
+                }
+                ColumnType::Binary => {
+                    Ok(vec![i256s.to_u256_series(name, U256Type::Binary, config)?])
+                }
+                _ => Err(err(&mixed_type_err)),
+            },
+            Self::U256s(u256s) => match col_type {
+                ColumnType::Int256 => u256s.into_u256_columns(name, config),
+                ColumnType::Float32 => {
+                    Ok(vec![u256s.to_u256_series(name, U256Type::F32, config)?])
+                }
+                ColumnType::Float64 => {
+                    Ok(vec![u256s.to_u256_series(name, U256Type::F64, config)?])
+                }
+                ColumnType::Binary => {
+                    Ok(vec![u256s.to_u256_series(name, U256Type::Binary, config)?])
+                }
+                _ => Err(err(&mixed_type_err)),
+            },
+            Self::F64s(f64s) => match col_type {
+                ColumnType::Float32 => Ok(vec![f64s.map(|v| v as f32).into_column(name)]),
+                ColumnType::Float64 => Ok(vec![f64s.into_column(name)]),
+                _ => Err(err(&mixed_type_err)),
+            },
             Self::Bytes(bytes) => match col_type {
                 ColumnType::Binary => Ok(vec![bytes.into_column(name)]),
                 ColumnType::Hex => Ok(vec![bytes.to_vec_hex(config.hex_prefix).into_column(name)]),
@@ -277,7 +323,6 @@ impl DynValues {
             },
             Self::Bools(bools) => Ok(vec![bools.into_column(name)]),
             Self::Strings(strings) => Ok(vec![strings.into_column(name)]),
-            _ => Err(err(&mixed_type_err)),
         }
     }
 }
@@ -361,6 +406,14 @@ mod tests {
         }
     }
 
+    fn get_config_hex() -> TableConfig {
+        TableConfig {
+            hex_prefix: true,
+            binary_type: ColumnEncoding::Hex,
+            u256_types: vec![U256Type::NamedBinary, U256Type::String, U256Type::F64],
+        }
+    }
+
     macro_rules! test_empty_column {
         ($($ty:ident)+) => {
             $({
@@ -373,13 +426,25 @@ mod tests {
         };
     }
 
-    macro_rules! test_column {
+    macro_rules! test_sol_column {
         ($($ty:ident => $exp:expr,)+) => {
             $({
                 let len = $exp.len();
                 let cols = ColumnType::$ty
                     .create_column_from_values(stringify!($ty).to_string(), $exp.clone().into_iter().map(|i| i.into()).collect(), len, &get_config())
                     .unwrap();
+                assert_eq!(cols.len(), 1);
+                assert_eq!(cols[0].dtype(), &DataType::$ty);
+                assert_eq!(cols[0].len(), len);
+            })+
+        };
+    }
+
+    macro_rules! test_dyn_column {
+        ($($ty:ident => $exp:expr,)+) => {
+            $({
+                let len = $exp.len();
+                let cols = DynValues::from($exp).into_columns(stringify!($ty).to_string(), ColumnType::$ty, &get_config()).unwrap();
                 assert_eq!(cols.len(), 1);
                 assert_eq!(cols[0].dtype(), &DataType::$ty);
                 assert_eq!(cols[0].len(), len);
@@ -414,7 +479,7 @@ mod tests {
                 "UInt256_f64".to_string()
             ]
         );
-        assert!(cols.iter().all(|c| c.len() == 0));
+        assert!(cols.iter().all(|c| c.is_empty()));
 
         let cols = ColumnType::Int256.create_empty_columns("Int256", &get_config());
         assert_eq!(cols.len(), 3);
@@ -430,12 +495,12 @@ mod tests {
                 "Int256_f64".to_string()
             ]
         );
-        assert!(cols.iter().all(|c| c.len() == 0));
+        assert!(cols.iter().all(|c| c.is_empty()));
     }
 
     #[test]
     fn test_column_creation() {
-        test_column!(
+        test_sol_column!(
             Boolean => vec![true, false, true],
             UInt32 => vec![1u32, 2, 3],
             UInt64 => vec![1u64, 2, 3],
@@ -446,5 +511,24 @@ mod tests {
             String => vec!["a".to_string(), "b".to_string(), "c".to_string()],
             Binary => vec![vec![1, 2], vec![3, 4], vec![5, 6]],
         );
+
+        test_dyn_column!(
+            Boolean => vec![true, false, true],
+            UInt32 => vec![1u32, 2, 3],
+            UInt64 => vec![1u64, 2, 3],
+            Int32 => vec![-1i32, 0, 1],
+            Int64 => vec![-1i64, 0, 1],
+            Float32 => vec![1.0, 2.0, 3.0],
+            Float64 => vec![1.0, 2.0, 3.0],
+            String => vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            Binary => vec![vec![1, 2], vec![3, 4], vec![5, 6]],
+        );
+
+        let cols = DynValues::from(vec![vec![1, 2], vec![3, 4], vec![5, 6]])
+            .into_columns("Hex".to_string(), ColumnType::Hex, &get_config_hex())
+            .unwrap();
+        assert_eq!(cols.len(), 1);
+        assert_eq!(cols[0].dtype(), &DataType::String);
+        assert_eq!(cols[0].len(), 3);
     }
 }
