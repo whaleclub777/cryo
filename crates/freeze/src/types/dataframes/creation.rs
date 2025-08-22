@@ -1,5 +1,15 @@
 /// convert a Vec to Column and add to Vec<Column>
 #[macro_export]
+macro_rules! with_column_primitive {
+    ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
+        if $schema.has_column($name) {
+            $all_columns.push(Column::new($name.into(), $value));
+        }
+    };
+}
+
+/// convert a Vec to Column and add to Vec<Column>, using [`crate::DynValues`]
+#[macro_export]
 macro_rules! with_column {
     ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
         if let Some(col_type) = $schema.column_type($name) {
