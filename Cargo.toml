@@ -56,7 +56,6 @@ polars = { version = "0.50.0", features = [
     "json",
     "dtype-struct",
 ] }
-prefix-hex = "0.7.1"
 pyo3 = { version = "0.25.0" }
 pyo3-build-config = "0.25.0"
 pyo3-async-runtimes = { version = "0.25.0", features = ["tokio-runtime"] }

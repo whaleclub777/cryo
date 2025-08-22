@@ -148,15 +148,15 @@ impl DynValues {
             match token {
                 DynSolValue::Address(a) => match column_encoding {
                     ColumnEncoding::Binary => bytes.push(a.to_vec()),
-                    ColumnEncoding::Hex => hexes.push(format!("{a:?}")),
+                    ColumnEncoding::Hex(with_prefix) => hexes.push(to_hex(a, with_prefix)),
                 },
                 DynSolValue::FixedBytes(b, _) => match column_encoding {
                     ColumnEncoding::Binary => bytes.push(b.to_vec()),
-                    ColumnEncoding::Hex => hexes.push(b.encode_hex()),
+                    ColumnEncoding::Hex(with_prefix) => hexes.push(to_hex(b, with_prefix)),
                 },
                 DynSolValue::Bytes(b) => match column_encoding {
                     ColumnEncoding::Binary => bytes.push(b),
-                    ColumnEncoding::Hex => hexes.push(b.encode_hex()),
+                    ColumnEncoding::Hex(with_prefix) => hexes.push(to_hex(b, with_prefix)),
                 },
                 DynSolValue::Uint(i, size) => {
                     if size <= 64 {
@@ -233,7 +233,12 @@ impl DynValues {
             Self::UInts(uints) => Ok(vec![uints.into_column(name)]),
             Self::I256s(i256s) => i256s.into_u256_columns(name, u256_types, column_encoding),
             Self::U256s(u256s) => u256s.into_u256_columns(name, u256_types, column_encoding),
-            Self::Bytes(bytes) => Ok(vec![bytes.into_column(name)]),
+            Self::Bytes(bytes) => {
+                match column_encoding {
+                    ColumnEncoding::Binary => Ok(vec![bytes.into_column(name)]),
+                    ColumnEncoding::Hex(_) => Ok(vec![bytes.into_column(name)]),
+                }
+            }
             Self::Hexes(hexes) => Ok(vec![hexes.into_column(name)]),
             Self::Bools(bools) => Ok(vec![bools.into_column(name)]),
             Self::Strings(strings) => Ok(vec![strings.into_column(name)]),
@@ -311,5 +316,13 @@ impl ColumnType {
             ColumnType::Binary => Column::new(name.into(), Vec::<RawBytes>::new()),
             ColumnType::Hex => Column::new(name.into(), Vec::<String>::new()),
         }
+    }
+}
+
+fn to_hex<T: ToHexExt>(value: T, with_prefix: bool) -> String {
+    if with_prefix {
+        value.encode_hex_with_prefix()
+    } else {
+        value.encode_hex()
     }
 }

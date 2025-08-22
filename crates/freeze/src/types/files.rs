@@ -132,8 +132,8 @@ impl FileFormat {
 pub enum ColumnEncoding {
     /// Raw binary encoding
     Binary,
-    /// Hex binary encoding
-    Hex,
+    /// Hex binary encoding, if true includes prefix 0x
+    Hex(bool),
 }
 
 impl ColumnEncoding {
@@ -141,7 +141,7 @@ impl ColumnEncoding {
     pub fn as_str(&self) -> &'static str {
         match *self {
             ColumnEncoding::Binary => "binary",
-            ColumnEncoding::Hex => "hex",
+            ColumnEncoding::Hex(_) => "hex",
         }
     }
 }

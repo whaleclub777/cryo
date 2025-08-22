@@ -13,10 +13,13 @@ macro_rules! with_column {
 macro_rules! with_column_binary {
     ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
         if $schema.has_column($name) {
-            if let Some(ColumnType::Hex) = $schema.column_type($name) {
-                $all_columns.push(Column::new($name.into(), $value.to_vec_hex()));
-            } else {
-                $all_columns.push(Column::new($name.into(), $value));
+            match $schema.binary_type {
+                ColumnEncoding::Hex(with_prefix) => {
+                    $all_columns.push(Column::new($name.into(), $value.to_vec_hex(with_prefix)));
+                }
+                ColumnEncoding::Binary => {
+                    $all_columns.push(Column::new($name.into(), $value));
+                }
             }
         }
     };

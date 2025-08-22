@@ -35,7 +35,7 @@ pub(crate) fn parse_schemas(
     let u256_types = parse_u256_types(args)?;
     let output_format = file_output::parse_output_format(args)?;
     let binary_column_format = match args.hex | (output_format != FileFormat::Parquet) {
-        true => ColumnEncoding::Hex,
+        true => ColumnEncoding::Hex(true),
         false => ColumnEncoding::Binary,
     };
 

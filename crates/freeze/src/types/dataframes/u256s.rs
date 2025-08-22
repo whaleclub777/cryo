@@ -55,7 +55,7 @@ impl ToU256Series for Vec<U256> {
             U256Type::Binary | U256Type::NamedBinary => {
                 let converted: Vec<RawBytes> = self.iter().map(|v| v.to_vec_u8()).collect();
                 match column_encoding {
-                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),
+                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }
@@ -103,7 +103,7 @@ impl ToU256Series for Vec<Option<U256>> {
                 let converted: Vec<Option<RawBytes>> =
                     self.iter().map(|v| v.map(|x| x.to_vec_u8())).collect();
                 match column_encoding {
-                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),
+                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }
@@ -157,7 +157,7 @@ impl ToU256Series for Vec<I256> {
             U256Type::Binary | U256Type::NamedBinary => {
                 let converted: Vec<RawBytes> = self.iter().map(|v| v.to_vec_u8()).collect();
                 match column_encoding {
-                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),
+                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }
@@ -205,7 +205,7 @@ impl ToU256Series for Vec<Option<I256>> {
                 let converted: Vec<Option<RawBytes>> =
                     self.iter().map(|v| v.map(|x| x.to_vec_u8())).collect();
                 match column_encoding {
-                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex())),
+                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }

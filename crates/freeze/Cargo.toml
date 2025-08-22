@@ -23,7 +23,6 @@ indexmap = { workspace = true }
 indicatif = { workspace = true }
 mesc = { workspace = true }
 polars = { workspace = true }
-prefix-hex = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
