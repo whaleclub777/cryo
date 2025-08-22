@@ -12,12 +12,11 @@ macro_rules! with_column {
 #[macro_export]
 macro_rules! with_column_binary {
     ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
-        if $schema.has_column($name) {
-            if let Some(ColumnType::Hex) = $schema.column_type($name) {
-                $all_columns
-                    .push(Column::new($name.into(), $value.to_vec_hex($schema.config.hex_prefix)));
-            } else {
-                $all_columns.push(Column::new($name.into(), $value));
+        if let Some(col_type) = $schema.column_type($name) {
+            match col_type {
+                ColumnType::Hex => $all_columns
+                    .push(Column::new($name.into(), $value.to_vec_hex($schema.config.hex_prefix))),
+                _ => $all_columns.push(Column::new($name.into(), $value)),
             }
         }
     };
@@ -27,8 +26,12 @@ macro_rules! with_column_binary {
 #[macro_export]
 macro_rules! with_column_u256 {
     ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
-        if $schema.has_column($name) {
-            let cols = DynValues::from($value).into_columns($name.to_string(), &$schema.config)?;
+        if let Some(col_type) = $schema.column_type($name) {
+            let cols = DynValues::from($value).into_columns(
+                $name.to_string(),
+                col_type,
+                &$schema.config,
+            )?;
             $all_columns.extend(cols);
         }
     };
