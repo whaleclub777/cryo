@@ -193,19 +193,16 @@ fn extract_event_cols(
         // Write columns even if there are no values decoded - indicates empty dataframe
         if values.is_empty() {
             for name in decoder.field_names() {
+                let name = format!("event__{name}");
+                let name = PlSmallStr::from_string(name);
                 if let Some(col_type) = schema.column_type(&name) {
-                    let name = format!("event__{name}");
-                    let name = PlSmallStr::from_string(name);
                     cols.extend(col_type.create_empty_columns(&name, &schema.config));
                 }
             }
         } else {
             for (name, data) in values {
+                let name = format!("event__{name}");
                 if let Some(col_type) = schema.column_type(&name) {
-                    let name = format!("event__{name}");
-                    if !schema.has_column(&name) {
-                        continue;
-                    }
                     let series_vec =
                         col_type.create_column_from_values(name, data, chunk_len, &schema.config);
                     match series_vec {
