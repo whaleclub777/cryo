@@ -58,7 +58,7 @@ pub use dataframes::*;
 pub use datatypes::*;
 pub use files::{ColumnEncoding, FileFormat, FileOutput, SubDir};
 pub use queries::{Query, QueryLabels, TimeDimension};
-pub use schemas::{ColumnType, SchemaFunctions, Schemas, Table, U256Type};
+pub use schemas::{ColumnType, SchemaFunctions, Schemas, Table, TableConfig, U256Type};
 pub use sources::{RateLimiter, Source, SourceLabels};
 // pub(crate) use summaries::FreezeSummaryAgg;
 // pub use summaries::{FreezeChunkSummary, FreezeSummary};

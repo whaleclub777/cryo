@@ -189,7 +189,6 @@ fn extract_event_cols(
     chunk_len: usize,
     schema: &Table,
 ) {
-    let u256_types: Vec<_> = schema.u256_types.clone().into_iter().collect();
     if let Some(decoder) = &schema.log_decoder {
         // Write columns even if there are no values decoded - indicates empty dataframe
         if values.is_empty() {
@@ -199,8 +198,7 @@ fn extract_event_cols(
                 if let Some(col_type) = schema.column_type(&name) {
                     cols.extend(col_type.create_empty_columns(
                         &name,
-                        &u256_types,
-                        schema.binary_type,
+                        &schema.config,
                     ));
                 }
             }
@@ -214,8 +212,7 @@ fn extract_event_cols(
                     name,
                     data,
                     chunk_len,
-                    &u256_types,
-                    schema.binary_type,
+                    &schema.config,
                 );
                 match series_vec {
                     Ok(s) => {

@@ -13,13 +13,10 @@ macro_rules! with_column {
 macro_rules! with_column_binary {
     ($all_columns:expr, $name:expr, $value:expr, $schema:expr) => {
         if $schema.has_column($name) {
-            match $schema.binary_type {
-                ColumnEncoding::Hex(with_prefix) => {
-                    $all_columns.push(Column::new($name.into(), $value.to_vec_hex(with_prefix)));
-                }
-                ColumnEncoding::Binary => {
-                    $all_columns.push(Column::new($name.into(), $value));
-                }
+            if let Some(ColumnType::Hex) = $schema.column_type($name) {
+                $all_columns.push(Column::new($name.into(), $value.to_vec_hex($schema.config.hex_prefix)));
+            } else {
+                $all_columns.push(Column::new($name.into(), $value));
             }
         }
     };
@@ -32,8 +29,7 @@ macro_rules! with_column_u256 {
         if $schema.has_column($name) {
             let cols = DynValues::from($value).into_columns(
                 $name.to_string(),
-                &$schema.u256_types,
-                $schema.binary_type,
+                &$schema.config,
             )?;
             $all_columns.extend(cols);
         }

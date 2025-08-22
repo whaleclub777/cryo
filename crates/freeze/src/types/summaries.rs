@@ -373,10 +373,10 @@ fn print_schema(name: &Datatype, schema: &Table) {
     for column in schema.columns() {
         if let Some(column_type) = schema.column_type(column) {
             if column_type.is_256() {
-                for uint256_type in schema.u256_types.iter() {
+                for uint256_type in schema.config.u256_types.iter() {
                     print_bullet(
                         column.to_owned() + uint256_type.suffix(column_type).as_str(),
-                        uint256_type.to_columntype(schema.binary_type).as_str(),
+                        uint256_type.to_columntype(schema.config.binary_type).as_str(),
                     );
                 }
             } else {

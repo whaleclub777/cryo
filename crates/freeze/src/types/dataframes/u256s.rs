@@ -9,7 +9,7 @@ pub trait ToU256Series {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Column, CollectError>;
 }
 
@@ -18,11 +18,11 @@ impl ToU256Series for OptionVec<U256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Column, CollectError> {
         match self {
-            OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
-            OptionVec::Option(v) => v.to_u256_series(name, dtype, column_encoding),
+            OptionVec::Some(v) => v.to_u256_series(name, dtype, config),
+            OptionVec::Option(v) => v.to_u256_series(name, dtype, config),
         }
     }
 }
@@ -32,11 +32,11 @@ impl ToU256Series for OptionVec<I256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Column, CollectError> {
         match self {
-            OptionVec::Some(v) => v.to_u256_series(name, dtype, column_encoding),
-            OptionVec::Option(v) => v.to_u256_series(name, dtype, column_encoding),
+            OptionVec::Some(v) => v.to_u256_series(name, dtype, config),
+            OptionVec::Option(v) => v.to_u256_series(name, dtype, config),
         }
     }
 }
@@ -46,7 +46,7 @@ impl ToU256Series for Vec<U256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::UInt256).as_str();
         let name = PlSmallStr::from_string(name);
@@ -54,8 +54,8 @@ impl ToU256Series for Vec<U256> {
         match dtype {
             U256Type::Binary | U256Type::NamedBinary => {
                 let converted: Vec<RawBytes> = self.iter().map(|v| v.to_vec_u8()).collect();
-                match column_encoding {
-                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
+                match config.binary_type {
+                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex(config.hex_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }
@@ -93,7 +93,7 @@ impl ToU256Series for Vec<Option<U256>> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::UInt256).as_str();
         let name = PlSmallStr::from_string(name);
@@ -102,8 +102,8 @@ impl ToU256Series for Vec<Option<U256>> {
             U256Type::Binary | U256Type::NamedBinary => {
                 let converted: Vec<Option<RawBytes>> =
                     self.iter().map(|v| v.map(|x| x.to_vec_u8())).collect();
-                match column_encoding {
-                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
+                match config.binary_type {
+                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex(config.hex_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }
@@ -148,7 +148,7 @@ impl ToU256Series for Vec<I256> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::Int256).as_str();
         let name = PlSmallStr::from_string(name);
@@ -156,8 +156,8 @@ impl ToU256Series for Vec<I256> {
         match dtype {
             U256Type::Binary | U256Type::NamedBinary => {
                 let converted: Vec<RawBytes> = self.iter().map(|v| v.to_vec_u8()).collect();
-                match column_encoding {
-                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
+                match config.binary_type {
+                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex(config.hex_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }
@@ -195,7 +195,7 @@ impl ToU256Series for Vec<Option<I256>> {
         &self,
         name: String,
         dtype: U256Type,
-        column_encoding: ColumnEncoding,
+        config: &TableConfig,
     ) -> Result<Column, CollectError> {
         let name = name + dtype.suffix(ColumnType::Int256).as_str();
         let name = PlSmallStr::from_string(name);
@@ -204,8 +204,8 @@ impl ToU256Series for Vec<Option<I256>> {
             U256Type::Binary | U256Type::NamedBinary => {
                 let converted: Vec<Option<RawBytes>> =
                     self.iter().map(|v| v.map(|x| x.to_vec_u8())).collect();
-                match column_encoding {
-                    ColumnEncoding::Hex(with_prefix) => Ok(Column::new(name, converted.to_vec_hex(with_prefix))),
+                match config.binary_type {
+                    ColumnEncoding::Hex => Ok(Column::new(name, converted.to_vec_hex(config.hex_prefix))),
                     ColumnEncoding::Binary => Ok(Column::new(name, converted)),
                 }
             }
