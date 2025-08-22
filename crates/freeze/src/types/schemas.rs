@@ -32,7 +32,6 @@ pub struct TableConfig {
 
     /// whether to include hex prefix for hex columns
     pub hex_prefix: bool,
-
     // pub hex_upper: bool,
 }
 
@@ -309,13 +308,7 @@ impl Datatype {
             columns.insert((*column.clone()).to_string(), ctype);
         }
 
-        let schema = Table {
-            datatype: *self,
-            sort_columns: sort,
-            columns,
-            config,
-            log_decoder,
-        };
+        let schema = Table { datatype: *self, sort_columns: sort, columns, config, log_decoder };
         Ok(schema)
     }
 }
@@ -367,16 +360,14 @@ mod tests {
     #[test]
     fn test_table_schema_explicit_cols() {
         let cols = Some(vec!["block_number".to_string(), "block_hash".to_string()]);
-        let table = Datatype::Blocks
-            .table_schema(get_config(), &None, &None, &cols, None, None)
-            .unwrap();
+        let table =
+            Datatype::Blocks.table_schema(get_config(), &None, &None, &cols, None, None).unwrap();
         assert_eq!(vec!["block_number", "block_hash"], table.columns());
 
         // "all" marker support
         let cols = Some(vec!["all".to_string()]);
-        let table = Datatype::Blocks
-            .table_schema(get_config(), &None, &None, &cols, None, None)
-            .unwrap();
+        let table =
+            Datatype::Blocks.table_schema(get_config(), &None, &None, &cols, None, None).unwrap();
         assert_eq!(21, table.columns().len());
         assert!(table.columns().contains(&"block_hash"));
         assert!(table.columns().contains(&"transactions_root"));
@@ -386,14 +377,7 @@ mod tests {
     fn test_table_schema_include_cols() {
         let inc_cols = Some(vec!["chain_id".to_string(), "receipts_root".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(
-                get_config(),
-                &inc_cols,
-                &None,
-                &None,
-                None,
-                None,
-            )
+            .table_schema(get_config(), &inc_cols, &None, &None, None, None)
             .unwrap();
         assert_eq!(9, table.columns().len());
         assert_eq!(["chain_id", "receipts_root"], table.columns()[7..9]);
@@ -401,14 +385,7 @@ mod tests {
         // Non-existing include is skipped
         let inc_cols = Some(vec!["chain_id".to_string(), "foo_bar".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(
-                get_config(),
-                &inc_cols,
-                &None,
-                &None,
-                None,
-                None,
-            )
+            .table_schema(get_config(), &inc_cols, &None, &None, None, None)
             .unwrap();
         assert_eq!(Some(&"chain_id"), table.columns().last());
         assert!(!table.columns().contains(&"foo_bar"));
@@ -416,14 +393,7 @@ mod tests {
         // "all" marker support
         let inc_cols = Some(vec!["all".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(
-                get_config(),
-                &inc_cols,
-                &None,
-                &None,
-                None,
-                None,
-            )
+            .table_schema(get_config(), &inc_cols, &None, &None, None, None)
             .unwrap();
         assert_eq!(21, table.columns().len());
         assert!(table.columns().contains(&"block_hash"));
@@ -433,23 +403,15 @@ mod tests {
     #[test]
     fn test_table_schema_exclude_cols() {
         // defaults
-        let table = Datatype::Blocks
-            .table_schema(get_config(), &None, &None, &None, None, None)
-            .unwrap();
+        let table =
+            Datatype::Blocks.table_schema(get_config(), &None, &None, &None, None, None).unwrap();
         assert_eq!(8, table.columns().len());
         assert!(table.columns().contains(&"author"));
         assert!(table.columns().contains(&"extra_data"));
 
         let ex_cols = Some(vec!["author".to_string(), "extra_data".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(
-                get_config(),
-                &None,
-                &ex_cols,
-                &None,
-                None,
-                None,
-            )
+            .table_schema(get_config(), &None, &ex_cols, &None, None, None)
             .unwrap();
         assert_eq!(6, table.columns().len());
         assert!(!table.columns().contains(&"author"));
@@ -458,14 +420,7 @@ mod tests {
         // Non-existing exclude is ignored
         let ex_cols = Some(vec!["timestamp".to_string(), "foo_bar".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(
-                get_config(),
-                &None,
-                &ex_cols,
-                &None,
-                None,
-                None,
-            )
+            .table_schema(get_config(), &None, &ex_cols, &None, None, None)
             .unwrap();
         assert_eq!(7, table.columns().len());
         assert!(!table.columns().contains(&"timestamp"));
@@ -477,14 +432,7 @@ mod tests {
         let inc_cols = Some(vec!["chain_id".to_string(), "receipts_root".to_string()]);
         let ex_cols = Some(vec!["author".to_string(), "extra_data".to_string()]);
         let table = Datatype::Blocks
-            .table_schema(
-                get_config(),
-                &inc_cols,
-                &ex_cols,
-                &None,
-                None,
-                None,
-            )
+            .table_schema(get_config(), &inc_cols, &ex_cols, &None, None, None)
             .unwrap();
         assert!(!table.columns().contains(&"author"));
         assert!(!table.columns().contains(&"extra_data"));

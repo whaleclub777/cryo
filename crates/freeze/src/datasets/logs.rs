@@ -196,10 +196,7 @@ fn extract_event_cols(
                 let name = format!("event__{name}");
                 let name = PlSmallStr::from_string(name);
                 if let Some(col_type) = schema.column_type(&name) {
-                    cols.extend(col_type.create_empty_columns(
-                        &name,
-                        &schema.config,
-                    ));
+                    cols.extend(col_type.create_empty_columns(&name, &schema.config));
                 }
             }
         } else {
@@ -208,12 +205,8 @@ fn extract_event_cols(
                 if !schema.has_column(&name) {
                     continue;
                 }
-                let series_vec = ColumnType::create_column_from_values(
-                    name,
-                    data,
-                    chunk_len,
-                    &schema.config,
-                );
+                let series_vec =
+                    ColumnType::create_column_from_values(name, data, chunk_len, &schema.config);
                 match series_vec {
                     Ok(s) => {
                         cols.extend(s);

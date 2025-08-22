@@ -8,7 +8,9 @@ use polars::{
     series::Series,
 };
 
-use crate::{err, schemas::TableConfig, CollectError, ColumnEncoding, ColumnType, RawBytes, ToU256Series};
+use crate::{
+    err, schemas::TableConfig, CollectError, ColumnEncoding, ColumnType, RawBytes, ToU256Series,
+};
 
 /// A vector that can hold either values or optional values.
 pub enum OptionVec<T> {
@@ -231,12 +233,10 @@ impl DynValues {
             Self::UInts(uints) => Ok(vec![uints.into_column(name)]),
             Self::I256s(i256s) => i256s.into_u256_columns(name, config),
             Self::U256s(u256s) => u256s.into_u256_columns(name, config),
-            Self::Bytes(bytes) => {
-                match config.binary_type {
-                    ColumnEncoding::Binary => Ok(vec![bytes.into_column(name)]),
-                    ColumnEncoding::Hex => Ok(vec![bytes.into_column(name)]),
-                }
-            }
+            Self::Bytes(bytes) => match config.binary_type {
+                ColumnEncoding::Binary => Ok(vec![bytes.into_column(name)]),
+                ColumnEncoding::Hex => Ok(vec![bytes.into_column(name)]),
+            },
             Self::Hexes(hexes) => Ok(vec![hexes.into_column(name)]),
             Self::Bools(bools) => Ok(vec![bools.into_column(name)]),
             Self::Strings(strings) => Ok(vec![strings.into_column(name)]),
@@ -263,11 +263,7 @@ impl ColumnType {
     }
 
     /// data should never be mixed type, otherwise this will return inconsistent results
-    pub fn create_empty_columns(
-        self,
-        name: &str,
-        config: &TableConfig,
-    ) -> Vec<Column> {
+    pub fn create_empty_columns(self, name: &str, config: &TableConfig) -> Vec<Column> {
         if self.is_256() {
             return self.create_empty_u256_columns(name, config);
         }
@@ -275,12 +271,9 @@ impl ColumnType {
     }
 
     /// Create empty columns for U256 types
-    pub fn create_empty_u256_columns(
-        self,
-        name: &str,
-        config: &TableConfig,
-    ) -> Vec<Column> {
-        config.u256_types
+    pub fn create_empty_u256_columns(self, name: &str, config: &TableConfig) -> Vec<Column> {
+        config
+            .u256_types
             .iter()
             .map(|u256_type| {
                 let new_type = u256_type.to_columntype(config.binary_type);
