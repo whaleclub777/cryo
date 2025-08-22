@@ -54,9 +54,7 @@ impl ToDataFramesMetaParams {
 /// #     #[macro_export]
 /// #     macro_rules! with_column_impl { ($cols:expr, $name:expr, $value:expr, $schema:expr) => {let _: Vec<Column> = $cols;}; }
 /// #     pub use with_column_impl as with_column;
-/// #     pub use with_column_impl as with_column_binary;
-/// #     pub use with_column_impl as with_column_u256;
-/// #     pub use with_column_impl as with_column_option_u256;
+/// #     pub use with_column_impl as with_column_primitive;
 /// #     pub trait ColumnData {
 /// #         fn column_types() -> indexmap::IndexMap<&'static str, ColumnType>;
 /// #     }
