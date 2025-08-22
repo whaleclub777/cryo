@@ -251,9 +251,13 @@ mod tests {
         );
         assert!(cols.iter().all(|c| c.len() == 3));
 
-        let cols = DynValues::from(vec![I256::try_from(-1).unwrap(), I256::try_from(0).unwrap(), I256::try_from(1).unwrap()])
-            .into_columns("Int256".to_string(), ColumnType::Int256, &get_config())
-            .unwrap();
+        let cols = DynValues::from(vec![
+            I256::try_from(-1).unwrap(),
+            I256::try_from(0).unwrap(),
+            I256::try_from(1).unwrap(),
+        ])
+        .into_columns("Int256".to_string(), ColumnType::Int256, &get_config())
+        .unwrap();
         assert_eq!(cols.len(), 3);
         assert_eq!(
             cols.iter().map(|c| c.dtype().clone()).collect::<Vec<_>>(),

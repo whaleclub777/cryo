@@ -203,8 +203,12 @@ fn extract_event_cols(
             for (name, data) in values {
                 let name = format!("event__{name}");
                 if let Some(col_type) = schema.column_type(&name) {
-                    let series_vec =
-                        col_type.create_column_from_values(name, data, chunk_len, &schema.config)?;
+                    let series_vec = col_type.create_column_from_values(
+                        name,
+                        data,
+                        chunk_len,
+                        &schema.config,
+                    )?;
                     cols.extend(series_vec);
                 }
             }
