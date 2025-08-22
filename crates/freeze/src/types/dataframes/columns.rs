@@ -245,7 +245,10 @@ impl DynValues {
         col_type: ColumnType,
         config: &TableConfig,
     ) -> Result<Vec<Column>, CollectError> {
-        let mixed_type_err = format!("could not parse column {name}, mixed type expect {col_type:?}, actually {}", self.dtype_str());
+        let mixed_type_err = format!(
+            "could not parse column {name}, mixed type expect {col_type:?}, actually {}",
+            self.dtype_str(),
+        );
         match self {
             Self::Ints(ints) => match col_type {
                 ColumnType::Int256 => {
