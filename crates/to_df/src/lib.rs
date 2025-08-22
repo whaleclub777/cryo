@@ -81,7 +81,7 @@ impl ToDataFramesMetaParams {
 ///     values: indexmap::IndexMap<String, Vec<DynSolValue>>,
 ///     n_rows: usize,
 ///     schema: &Table,
-/// ) {
+/// ) -> Result<(), CollectError> {
 ///     todo!()
 /// }
 /// ```
