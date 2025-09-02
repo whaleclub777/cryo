@@ -105,16 +105,12 @@ where
         match self {
             OptionVec::Some(v) => Ok(v),
             OptionVec::Option(v) => {
-                let mut result = Vec::with_capacity(v.len());
-                for (i, opt) in v.into_iter().enumerate() {
-                    match opt {
-                        Some(value) => result.push(value),
-                        None => return Err(crate::CollectError::CollectError(
-                            format!("Missing value at index {}", i)
-                        )),
-                    }
-                }
-                Ok(result)
+                v.into_iter()
+                    .enumerate()
+                    .map(|(i, opt)| opt.ok_or_else(|| crate::CollectError::CollectError(
+                        format!("Missing value at index {}", i)
+                    )))
+                    .collect::<Result<Vec<_>, _>>()
             }
         }
     }

@@ -61,9 +61,6 @@ impl ToDataFramesMetaParams {
 /// #     pub trait ToDataFrames: Sized {
 /// #         fn create_dfs(self, schemas: &HashMap<Datatype, Table>, chain_id: u64) -> Result<HashMap<Datatype, DataFrame>, CollectError>;
 /// #     }
-/// #     pub trait FromDataFrames: Sized + Default {
-/// #         fn from_dfs(dfs: HashMap<Datatype, DataFrame>, datatype: &Datatype) -> Result<Self, CollectError>;
-/// #     }
 /// # }
 /// use cryo_freeze::*;
 /// use polars::prelude::*;

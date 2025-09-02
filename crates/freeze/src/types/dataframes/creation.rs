@@ -1,80 +1,7 @@
 use alloy::dyn_abi::DynSolValue;
 use polars::prelude::Column;
 
-use crate::{err, CollectError, ColumnType, DynValues, OptionVec, RawBytes, TableConfig};
-
-/// Parse binary column data into OptionVec<U256>
-pub fn parse_binary_to_u256_option_vec<'a>(
-    binary_data: impl Iterator<Item = Option<&'a [u8]>>,
-) -> OptionVec<alloy::primitives::U256> {
-    let mut has_none = false;
-    let values: Vec<Option<alloy::primitives::U256>> = binary_data
-        .map(|opt_bytes| {
-            match opt_bytes {
-                Some(bytes) => {
-                    if bytes.len() >= 32 {
-                        Some(alloy::primitives::U256::from_be_bytes(
-                            bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
-                        ))
-                    } else {
-                        // Pad with zeros if needed
-                        let mut padded = [0u8; 32];
-                        let start_idx = 32 - bytes.len();
-                        padded[start_idx..].copy_from_slice(bytes);
-                        Some(alloy::primitives::U256::from_be_bytes(padded))
-                    }
-                }
-                None => {
-                    has_none = true;
-                    None
-                }
-            }
-        })
-        .collect();
-
-    if has_none {
-        OptionVec::Option(values)
-    } else {
-        OptionVec::Some(values.into_iter().map(|v| v.unwrap_or_default()).collect())
-    }
-}
-
-/// Parse binary column data into OptionVec<I256>
-pub fn parse_binary_to_i256_option_vec<'a>(
-    binary_data: impl Iterator<Item = Option<&'a [u8]>>,
-) -> OptionVec<alloy::primitives::I256> {
-    let mut has_none = false;
-    let values: Vec<Option<alloy::primitives::I256>> = binary_data
-        .map(|opt_bytes| {
-            match opt_bytes {
-                Some(bytes) => {
-                    if bytes.len() >= 32 {
-                        let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
-                        let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
-                        Some(alloy::primitives::I256::from_raw(u256_val))
-                    } else {
-                        // Pad with zeros if needed
-                        let mut padded = [0u8; 32];
-                        let start_idx = 32 - bytes.len();
-                        padded[start_idx..].copy_from_slice(bytes);
-                        let u256_val = alloy::primitives::U256::from_be_bytes(padded);
-                        Some(alloy::primitives::I256::from_raw(u256_val))
-                    }
-                }
-                None => {
-                    has_none = true;
-                    None
-                }
-            }
-        })
-        .collect();
-
-    if has_none {
-        OptionVec::Option(values)
-    } else {
-        OptionVec::Some(values.into_iter().map(|v| v.unwrap_or_default()).collect())
-    }
-}
+use crate::{err, CollectError, ColumnType, DynValues, RawBytes, TableConfig};
 
 /// convert a Vec to Column and add to Vec<Column>
 #[macro_export]
@@ -109,25 +36,14 @@ macro_rules! parse_column_primitive {
         let option_vec = {
             let series = $df.column($column_name).map_err(CollectError::PolarsError)?;
             let str_array = series.str().map_err(CollectError::PolarsError)?;
-            let mut has_none = false;
             let values: Vec<Option<String>> = str_array
                 .into_iter()
                 .map(|opt_str| {
-                    match opt_str {
-                        Some(s) => Some(s.to_string()),
-                        None => {
-                            has_none = true;
-                            None
-                        }
-                    }
+                    opt_str.map(|s| s.to_string())
                 })
                 .collect();
             
-            if has_none {
-                OptionVec::Option(values)
-            } else {
-                OptionVec::Some(values.into_iter().map(|v| v.unwrap_or_default()).collect())
-            }
+            OptionVec::Option(values)
         };
         $result.$field = option_vec.try_into().map_err(|_| CollectError::CollectError("Failed to convert OptionVec".to_string()))?;
     };
@@ -135,25 +51,11 @@ macro_rules! parse_column_primitive {
         let option_vec = {
             let series = $df.column($column_name).map_err(CollectError::PolarsError)?;
             let array = series.$polars_type().map_err(CollectError::PolarsError)?;
-            let mut has_none = false;
             let values: Vec<Option<_>> = array
                 .into_iter()
-                .map(|opt_val| {
-                    match opt_val {
-                        Some(v) => Some(v),
-                        None => {
-                            has_none = true;
-                            None
-                        }
-                    }
-                })
                 .collect();
             
-            if has_none {
-                OptionVec::Option(values)
-            } else {
-                OptionVec::Some(values.into_iter().map(|v| v.unwrap_or_default()).collect())
-            }
+            OptionVec::Option(values)
         };
         $result.$field = option_vec.try_into().map_err(|_| CollectError::CollectError("Failed to convert OptionVec".to_string()))?;
     };

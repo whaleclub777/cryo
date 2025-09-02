@@ -101,7 +101,7 @@ impl ToVecHex for OptionVec<RawBytes> {
 }
 
 /// Trait for converting binary data to specific types
-pub trait FromBinaryVec<T> {
+pub trait FromBinaryVec {
     /// Convert from Vec<Option<RawBytes>> to Self
     fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError>
     where
@@ -109,7 +109,7 @@ pub trait FromBinaryVec<T> {
 }
 
 /// Implementation for Vec<U256>
-impl FromBinaryVec<U256> for Vec<U256> {
+impl FromBinaryVec for Vec<U256> {
     fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
         let mut result = Vec::with_capacity(data.len());
         for (i, opt_bytes) in data.into_iter().enumerate() {
@@ -137,7 +137,7 @@ impl FromBinaryVec<U256> for Vec<U256> {
 }
 
 /// Implementation for Vec<Option<U256>>
-impl FromBinaryVec<U256> for Vec<Option<U256>> {
+impl FromBinaryVec for Vec<Option<U256>> {
     fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
         let mut result = Vec::with_capacity(data.len());
         for opt_bytes in data {
@@ -163,7 +163,7 @@ impl FromBinaryVec<U256> for Vec<Option<U256>> {
 }
 
 /// Implementation for Vec<I256>
-impl FromBinaryVec<I256> for Vec<I256> {
+impl FromBinaryVec for Vec<I256> {
     fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
         let mut result = Vec::with_capacity(data.len());
         for (i, opt_bytes) in data.into_iter().enumerate() {
@@ -174,8 +174,8 @@ impl FromBinaryVec<I256> for Vec<I256> {
                         let u256_val = U256::from_be_bytes(u256_bytes);
                         result.push(I256::from_raw(u256_val));
                     } else {
-                        // Pad with zeros if needed
-                        let mut padded = [0u8; 32];
+                        // Pad with 0xff for signed integers (negative extension)
+                        let mut padded = [0xffu8; 32];
                         let start_idx = 32 - bytes.len();
                         padded[start_idx..].copy_from_slice(&bytes);
                         let u256_val = U256::from_be_bytes(padded);
@@ -192,7 +192,7 @@ impl FromBinaryVec<I256> for Vec<I256> {
 }
 
 /// Implementation for Vec<Option<I256>>
-impl FromBinaryVec<I256> for Vec<Option<I256>> {
+impl FromBinaryVec for Vec<Option<I256>> {
     fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
         let mut result = Vec::with_capacity(data.len());
         for opt_bytes in data {
@@ -203,8 +203,8 @@ impl FromBinaryVec<I256> for Vec<Option<I256>> {
                         let u256_val = U256::from_be_bytes(u256_bytes);
                         result.push(Some(I256::from_raw(u256_val)));
                     } else {
-                        // Pad with zeros if needed
-                        let mut padded = [0u8; 32];
+                        // Pad with 0xff for signed integers (negative extension)
+                        let mut padded = [0xffu8; 32];
                         let start_idx = 32 - bytes.len();
                         padded[start_idx..].copy_from_slice(&bytes);
                         let u256_val = U256::from_be_bytes(padded);
