@@ -36,28 +36,22 @@ macro_rules! parse_column_primitive {
         let option_vec = {
             let series = $df.column($column_name).map_err(CollectError::PolarsError)?;
             let str_array = series.str().map_err(CollectError::PolarsError)?;
-            let values: Vec<Option<String>> = str_array
-                .into_iter()
-                .map(|opt_str| {
-                    opt_str.map(|s| s.to_string())
-                })
-                .collect();
-            
+            let values: Vec<Option<String>> =
+                str_array.into_iter().map(|opt_str| opt_str.map(|s| s.to_string())).collect();
+
             OptionVec::Option(values)
         };
-        $result.$field = option_vec.try_into().map_err(|_| CollectError::CollectError("Failed to convert OptionVec".to_string()))?;
+        $result.$field = option_vec.try_into()?;
     };
     ($result:expr, $field:ident, $column_name:expr, $df:expr, $polars_type:ident) => {
         let option_vec = {
             let series = $df.column($column_name).map_err(CollectError::PolarsError)?;
             let array = series.$polars_type().map_err(CollectError::PolarsError)?;
-            let values: Vec<Option<_>> = array
-                .into_iter()
-                .collect();
-            
+            let values: Vec<Option<_>> = array.into_iter().collect();
+
             OptionVec::Option(values)
         };
-        $result.$field = option_vec.try_into().map_err(|_| CollectError::CollectError("Failed to convert OptionVec".to_string()))?;
+        $result.$field = option_vec.try_into()?;
     };
 }
 
@@ -68,18 +62,15 @@ macro_rules! parse_column {
         // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
         let u256_column_name = format!("{}_u256binary", $field_name_str);
         let binary_column_name = format!("{}_binary", $field_name_str);
-        
-        let column_result = $df.column(&u256_column_name)
-            .or_else(|_| $df.column(&binary_column_name));
-        
+
+        let column_result =
+            $df.column(&u256_column_name).or_else(|_| $df.column(&binary_column_name));
+
         match column_result {
             Ok(series) => {
-                let binary_data = series.binary()
-                    .map_err(CollectError::PolarsError)?;
-                let raw_data: Vec<Option<RawBytes>> = binary_data
-                    .into_iter()
-                    .map(|opt| opt.map(|bytes| bytes.to_vec()))
-                    .collect();
+                let binary_data = series.binary().map_err(CollectError::PolarsError)?;
+                let raw_data: Vec<Option<RawBytes>> =
+                    binary_data.into_iter().map(|opt| opt.map(|bytes| bytes.to_vec())).collect();
                 $result.$field = $crate::FromBinaryVec::from_binary_vec(raw_data)?;
             }
             Err(_) => {
@@ -91,18 +82,15 @@ macro_rules! parse_column {
         // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
         let i256_column_name = format!("{}_i256binary", $field_name_str);
         let binary_column_name = format!("{}_binary", $field_name_str);
-        
-        let column_result = $df.column(&i256_column_name)
-            .or_else(|_| $df.column(&binary_column_name));
-        
+
+        let column_result =
+            $df.column(&i256_column_name).or_else(|_| $df.column(&binary_column_name));
+
         match column_result {
             Ok(series) => {
-                let binary_data = series.binary()
-                    .map_err(CollectError::PolarsError)?;
-                let raw_data: Vec<Option<RawBytes>> = binary_data
-                    .into_iter()
-                    .map(|opt| opt.map(|bytes| bytes.to_vec()))
-                    .collect();
+                let binary_data = series.binary().map_err(CollectError::PolarsError)?;
+                let raw_data: Vec<Option<RawBytes>> =
+                    binary_data.into_iter().map(|opt| opt.map(|bytes| bytes.to_vec())).collect();
                 $result.$field = $crate::FromBinaryVec::from_binary_vec(raw_data)?;
             }
             Err(_) => {

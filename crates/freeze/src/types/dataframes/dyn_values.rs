@@ -104,14 +104,15 @@ where
     fn try_into(self) -> Result<Vec<T>, Self::Error> {
         match self {
             OptionVec::Some(v) => Ok(v),
-            OptionVec::Option(v) => {
-                v.into_iter()
-                    .enumerate()
-                    .map(|(i, opt)| opt.ok_or_else(|| crate::CollectError::CollectError(
-                        format!("Missing value at index {}", i)
-                    )))
-                    .collect::<Result<Vec<_>, _>>()
-            }
+            OptionVec::Option(v) => v
+                .into_iter()
+                .enumerate()
+                .map(|(i, opt)| {
+                    opt.ok_or_else(|| {
+                        crate::CollectError::CollectError(format!("Missing value at index {}", i))
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>(),
         }
     }
 }

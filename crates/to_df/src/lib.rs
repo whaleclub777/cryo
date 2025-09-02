@@ -229,8 +229,8 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
 /// # pub mod cryo_freeze {
 /// #     pub mod polars {
 /// #         pub mod prelude {
-/// #             pub struct DataFrame; 
-/// #             impl DataFrame { 
+/// #             pub struct DataFrame;
+/// #             impl DataFrame {
 /// #                 pub fn column(&self, name: &str) -> Result<&Series, ()> { Ok(&Series) }
 /// #                 pub fn height(&self) -> usize { 0 }
 /// #             }
@@ -310,6 +310,9 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
                 "Vec < I256 >" | "Vec < Option < I256 > >" => quote! {
                     parse_column!(result, #name, #field_name_str, df, I256);
                 },
+                "Vec < RawBytes >" | "Vec < Option < RawBytes > >" => quote! {
+                    parse_column_primitive!(result, #name, #field_name_str, df, binary);
+                },
                 _ => quote! {
                     // Handle unsupported types - for now, just set to default
                     result.#name = vec![];
@@ -325,16 +328,16 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
                 datatype: &Datatype,
             ) -> Result<Self, CollectError> {
                 use cryo_freeze::{parse_column, parse_column_primitive, FromBinaryVec, OptionVec, RawBytes};
-                
+
                 let df = dfs.get(datatype).ok_or_else(|| {
                     CollectError::PolarsError(polars::prelude::PolarsError::ColumnNotFound("dataframe not found".into()))
                 })?;
-                
+
                 let mut result = Self::default();
                 result.n_rows = df.height() as u64;
-                
+
                 #(#field_population)*
-                
+
                 Ok(result)
             }
         }
