@@ -274,7 +274,7 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
     let field_names_and_types: Vec<_> =
         input.fields.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect();
 
-    // Generate field population code
+    // Generate field population code using the new parse_column macros
     let field_population: Vec<_> = field_names_and_types
         .iter()
         .filter(|(name, _)| quote!(#name).to_string() != "n_rows")
@@ -283,291 +283,66 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
             let field_name_str = quote!(#name).to_string();
             match quote!(#ty).to_string().as_str() {
                 "Vec < u32 >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .u32()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, u32);
                 },
                 "Vec < u64 >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .u64()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, u64);
                 },
                 "Vec < i32 >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .i32()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, i32);
                 },
                 "Vec < i64 >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .i64()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, i64);
                 },
                 "Vec < f32 >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .f32()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, f32);
                 },
                 "Vec < f64 >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .f64()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, f64);
                 },
                 "Vec < String >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .str()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default().to_string())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, str);
                 },
                 "Vec < bool >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .bool()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.unwrap_or_default())
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, bool);
                 },
                 // Handle Option types
                 "Vec < Option < u32 > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .u32()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, u32, Option);
                 },
                 "Vec < Option < u64 > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .u64()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, u64, Option);
                 },
                 "Vec < Option < i32 > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .i32()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, i32, Option);
                 },
                 "Vec < Option < i64 > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .i64()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, i64, Option);
                 },
                 "Vec < Option < f32 > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .f32()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, f32, Option);
                 },
                 "Vec < Option < f64 > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .f64()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, f64, Option);
                 },
                 "Vec < Option < String > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .str()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .map(|x| x.map(|s| s.to_string()))
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, str, Option);
                 },
                 "Vec < Option < bool > >" => quote! {
-                    result.#name = df.column(#field_name_str)
-                        .map_err(CollectError::PolarsError)?
-                        .bool()
-                        .map_err(CollectError::PolarsError)?
-                        .into_iter()
-                        .collect();
+                    parse_column_primitive!(result, #name, #field_name_str, df, bool, Option);
                 },
-                // Handle U256 types with binary column name fallback
+                // Handle U256/I256 types with binary column name fallback
                 "Vec < U256 >" => quote! {
-                    // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
-                    let u256_column_name = format!("{}_u256binary", #field_name_str);
-                    let binary_column_name = format!("{}_binary", #field_name_str);
-                    
-                    let column_result = df.column(&u256_column_name)
-                        .or_else(|_| df.column(&binary_column_name));
-                    
-                    match column_result {
-                        Ok(series) => {
-                            let binary_data = series.binary()
-                                .map_err(CollectError::PolarsError)?;
-                            result.#name = binary_data.into_iter()
-                                .map(|opt_bytes| {
-                                    match opt_bytes {
-                                        Some(bytes) => {
-                                            if bytes.len() >= 32 {
-                                                alloy::primitives::U256::from_be_bytes(
-                                                    bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
-                                                )
-                                            } else {
-                                                // Pad with zeros if needed
-                                                let mut padded = [0u8; 32];
-                                                let start_idx = 32 - bytes.len();
-                                                padded[start_idx..].copy_from_slice(bytes);
-                                                alloy::primitives::U256::from_be_bytes(padded)
-                                            }
-                                        }
-                                        None => alloy::primitives::U256::ZERO,
-                                    }
-                                })
-                                .collect();
-                        }
-                        Err(_) => {
-                            result.#name = vec![];
-                        }
-                    }
+                    parse_column!(result, #name, #field_name_str, df, U256);
                 },
                 "Vec < I256 >" => quote! {
-                    // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
-                    let i256_column_name = format!("{}_i256binary", #field_name_str);
-                    let binary_column_name = format!("{}_binary", #field_name_str);
-                    
-                    let column_result = df.column(&i256_column_name)
-                        .or_else(|_| df.column(&binary_column_name));
-                    
-                    match column_result {
-                        Ok(series) => {
-                            let binary_data = series.binary()
-                                .map_err(CollectError::PolarsError)?;
-                            result.#name = binary_data.into_iter()
-                                .map(|opt_bytes| {
-                                    match opt_bytes {
-                                        Some(bytes) => {
-                                            if bytes.len() >= 32 {
-                                                let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
-                                                let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
-                                                alloy::primitives::I256::from_raw(u256_val)
-                                            } else {
-                                                // Pad with zeros if needed
-                                                let mut padded = [0u8; 32];
-                                                let start_idx = 32 - bytes.len();
-                                                padded[start_idx..].copy_from_slice(bytes);
-                                                let u256_val = alloy::primitives::U256::from_be_bytes(padded);
-                                                alloy::primitives::I256::from_raw(u256_val)
-                                            }
-                                        }
-                                        None => alloy::primitives::I256::ZERO,
-                                    }
-                                })
-                                .collect();
-                        }
-                        Err(_) => {
-                            result.#name = vec![];
-                        }
-                    }
+                    parse_column!(result, #name, #field_name_str, df, I256);
                 },
                 "Vec < Option < U256 > >" => quote! {
-                    // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
-                    let u256_column_name = format!("{}_u256binary", #field_name_str);
-                    let binary_column_name = format!("{}_binary", #field_name_str);
-                    
-                    let column_result = df.column(&u256_column_name)
-                        .or_else(|_| df.column(&binary_column_name));
-                    
-                    match column_result {
-                        Ok(series) => {
-                            let binary_data = series.binary()
-                                .map_err(CollectError::PolarsError)?;
-                            result.#name = binary_data.into_iter()
-                                .map(|opt_bytes| {
-                                    opt_bytes.map(|bytes| {
-                                        if bytes.len() >= 32 {
-                                            alloy::primitives::U256::from_be_bytes(
-                                                bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
-                                            )
-                                        } else {
-                                            // Pad with zeros if needed
-                                            let mut padded = [0u8; 32];
-                                            let start_idx = 32 - bytes.len();
-                                            padded[start_idx..].copy_from_slice(bytes);
-                                            alloy::primitives::U256::from_be_bytes(padded)
-                                        }
-                                    })
-                                })
-                                .collect();
-                        }
-                        Err(_) => {
-                            result.#name = vec![];
-                        }
-                    }
+                    parse_column!(result, #name, #field_name_str, df, U256, Option);
                 },
                 "Vec < Option < I256 > >" => quote! {
-                    // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
-                    let i256_column_name = format!("{}_i256binary", #field_name_str);
-                    let binary_column_name = format!("{}_binary", #field_name_str);
-                    
-                    let column_result = df.column(&i256_column_name)
-                        .or_else(|_| df.column(&binary_column_name));
-                    
-                    match column_result {
-                        Ok(series) => {
-                            let binary_data = series.binary()
-                                .map_err(CollectError::PolarsError)?;
-                            result.#name = binary_data.into_iter()
-                                .map(|opt_bytes| {
-                                    opt_bytes.map(|bytes| {
-                                        if bytes.len() >= 32 {
-                                            let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
-                                            let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
-                                            alloy::primitives::I256::from_raw(u256_val)
-                                        } else {
-                                            // Pad with zeros if needed
-                                            let mut padded = [0u8; 32];
-                                            let start_idx = 32 - bytes.len();
-                                            padded[start_idx..].copy_from_slice(bytes);
-                                            let u256_val = alloy::primitives::U256::from_be_bytes(padded);
-                                            alloy::primitives::I256::from_raw(u256_val)
-                                        }
-                                    })
-                                })
-                                .collect();
-                        }
-                        Err(_) => {
-                            result.#name = vec![];
-                        }
-                    }
+                    parse_column!(result, #name, #field_name_str, df, I256, Option);
                 },
                 _ => quote! {
                     // Handle unsupported types - for now, just set to default
@@ -583,6 +358,8 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
                 dfs: std::collections::HashMap<Datatype, DataFrame>,
                 datatype: &Datatype,
             ) -> Result<Self, CollectError> {
+                use cryo_freeze::{parse_column, parse_column_primitive};
+                
                 let df = dfs.get(datatype).ok_or_else(|| {
                     CollectError::PolarsError(polars::prelude::PolarsError::ColumnNotFound("dataframe not found".into()))
                 })?;

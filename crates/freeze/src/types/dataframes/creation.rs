@@ -28,6 +28,200 @@ macro_rules! with_column {
     };
 }
 
+/// parse a primitive type column from DataFrame and populate struct field
+#[macro_export]
+macro_rules! parse_column_primitive {
+    // Special handling for String since we need to convert &str to String
+    ($result:expr, $field:ident, $column_name:expr, $df:expr, str) => {
+        $result.$field = $df.column($column_name)
+            .map_err(CollectError::PolarsError)?
+            .str()
+            .map_err(CollectError::PolarsError)?
+            .into_iter()
+            .map(|x| x.unwrap_or_default().to_string())
+            .collect();
+    };
+    ($result:expr, $field:ident, $column_name:expr, $df:expr, str, Option) => {
+        $result.$field = $df.column($column_name)
+            .map_err(CollectError::PolarsError)?
+            .str()
+            .map_err(CollectError::PolarsError)?
+            .into_iter()
+            .map(|x| x.map(|s| s.to_string()))
+            .collect();
+    };
+    ($result:expr, $field:ident, $column_name:expr, $df:expr, $polars_type:ident) => {
+        $result.$field = $df.column($column_name)
+            .map_err(CollectError::PolarsError)?
+            .$polars_type()
+            .map_err(CollectError::PolarsError)?
+            .into_iter()
+            .map(|x| x.unwrap_or_default())
+            .collect();
+    };
+    ($result:expr, $field:ident, $column_name:expr, $df:expr, $polars_type:ident, Option) => {
+        $result.$field = $df.column($column_name)
+            .map_err(CollectError::PolarsError)?
+            .$polars_type()
+            .map_err(CollectError::PolarsError)?
+            .into_iter()
+            .collect();
+    };
+}
+
+/// parse a complex type column from DataFrame and populate struct field (for U256/I256)
+#[macro_export]
+macro_rules! parse_column {
+    ($result:expr, $field:ident, $field_name_str:expr, $df:expr, U256) => {
+        // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
+        let u256_column_name = format!("{}_u256binary", $field_name_str);
+        let binary_column_name = format!("{}_binary", $field_name_str);
+        
+        let column_result = $df.column(&u256_column_name)
+            .or_else(|_| $df.column(&binary_column_name));
+        
+        match column_result {
+            Ok(series) => {
+                let binary_data = series.binary()
+                    .map_err(CollectError::PolarsError)?;
+                $result.$field = binary_data.into_iter()
+                    .map(|opt_bytes| {
+                        match opt_bytes {
+                            Some(bytes) => {
+                                if bytes.len() >= 32 {
+                                    alloy::primitives::U256::from_be_bytes(
+                                        bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
+                                    )
+                                } else {
+                                    // Pad with zeros if needed
+                                    let mut padded = [0u8; 32];
+                                    let start_idx = 32 - bytes.len();
+                                    padded[start_idx..].copy_from_slice(bytes);
+                                    alloy::primitives::U256::from_be_bytes(padded)
+                                }
+                            }
+                            None => alloy::primitives::U256::ZERO,
+                        }
+                    })
+                    .collect();
+            }
+            Err(_) => {
+                $result.$field = vec![];
+            }
+        }
+    };
+    ($result:expr, $field:ident, $field_name_str:expr, $df:expr, I256) => {
+        // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
+        let i256_column_name = format!("{}_i256binary", $field_name_str);
+        let binary_column_name = format!("{}_binary", $field_name_str);
+        
+        let column_result = $df.column(&i256_column_name)
+            .or_else(|_| $df.column(&binary_column_name));
+        
+        match column_result {
+            Ok(series) => {
+                let binary_data = series.binary()
+                    .map_err(CollectError::PolarsError)?;
+                $result.$field = binary_data.into_iter()
+                    .map(|opt_bytes| {
+                        match opt_bytes {
+                            Some(bytes) => {
+                                if bytes.len() >= 32 {
+                                    let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
+                                    let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
+                                    alloy::primitives::I256::from_raw(u256_val)
+                                } else {
+                                    // Pad with zeros if needed
+                                    let mut padded = [0u8; 32];
+                                    let start_idx = 32 - bytes.len();
+                                    padded[start_idx..].copy_from_slice(bytes);
+                                    let u256_val = alloy::primitives::U256::from_be_bytes(padded);
+                                    alloy::primitives::I256::from_raw(u256_val)
+                                }
+                            }
+                            None => alloy::primitives::I256::ZERO,
+                        }
+                    })
+                    .collect();
+            }
+            Err(_) => {
+                $result.$field = vec![];
+            }
+        }
+    };
+    ($result:expr, $field:ident, $field_name_str:expr, $df:expr, U256, Option) => {
+        // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
+        let u256_column_name = format!("{}_u256binary", $field_name_str);
+        let binary_column_name = format!("{}_binary", $field_name_str);
+        
+        let column_result = $df.column(&u256_column_name)
+            .or_else(|_| $df.column(&binary_column_name));
+        
+        match column_result {
+            Ok(series) => {
+                let binary_data = series.binary()
+                    .map_err(CollectError::PolarsError)?;
+                $result.$field = binary_data.into_iter()
+                    .map(|opt_bytes| {
+                        opt_bytes.map(|bytes| {
+                            if bytes.len() >= 32 {
+                                alloy::primitives::U256::from_be_bytes(
+                                    bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
+                                )
+                            } else {
+                                // Pad with zeros if needed
+                                let mut padded = [0u8; 32];
+                                let start_idx = 32 - bytes.len();
+                                padded[start_idx..].copy_from_slice(bytes);
+                                alloy::primitives::U256::from_be_bytes(padded)
+                            }
+                        })
+                    })
+                    .collect();
+            }
+            Err(_) => {
+                $result.$field = vec![];
+            }
+        }
+    };
+    ($result:expr, $field:ident, $field_name_str:expr, $df:expr, I256, Option) => {
+        // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
+        let i256_column_name = format!("{}_i256binary", $field_name_str);
+        let binary_column_name = format!("{}_binary", $field_name_str);
+        
+        let column_result = $df.column(&i256_column_name)
+            .or_else(|_| $df.column(&binary_column_name));
+        
+        match column_result {
+            Ok(series) => {
+                let binary_data = series.binary()
+                    .map_err(CollectError::PolarsError)?;
+                $result.$field = binary_data.into_iter()
+                    .map(|opt_bytes| {
+                        opt_bytes.map(|bytes| {
+                            if bytes.len() >= 32 {
+                                let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
+                                let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
+                                alloy::primitives::I256::from_raw(u256_val)
+                            } else {
+                                // Pad with zeros if needed
+                                let mut padded = [0u8; 32];
+                                let start_idx = 32 - bytes.len();
+                                padded[start_idx..].copy_from_slice(bytes);
+                                let u256_val = alloy::primitives::U256::from_be_bytes(padded);
+                                alloy::primitives::I256::from_raw(u256_val)
+                            }
+                        })
+                    })
+                    .collect();
+            }
+            Err(_) => {
+                $result.$field = vec![];
+            }
+        }
+    };
+}
+
 impl ColumnType {
     /// data should never be mixed type, otherwise this will return inconsistent results
     pub fn create_column_from_values(
