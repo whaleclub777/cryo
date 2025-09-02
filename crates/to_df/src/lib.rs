@@ -229,6 +229,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
 /// # pub mod cryo_freeze {
 /// #     pub mod polars {
 /// #         pub mod prelude {
+/// #             pub enum PolarsError { ColumnNotFound(String) }
 /// #             pub struct DataFrame;
 /// #             impl DataFrame {
 /// #                 pub fn column(&self, name: &str) -> Result<&Series, ()> { Ok(&Series) }
@@ -244,11 +245,16 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
 /// #     }
 /// #     use polars::prelude::*;
 /// #     use std::collections::HashMap;
-/// #     pub enum CollectError { PolarsError(()) }
+/// #     pub enum CollectError { PolarsError(PolarsError) }
 /// #     #[derive(Hash, PartialEq, Eq)]
 /// #     pub enum Datatype { MyStruct }
-/// #     pub trait FromDataFrames: Sized + Default {
-/// #         fn from_dfs(dfs: HashMap<Datatype, DataFrame>, datatype: &Datatype) -> Result<Self, CollectError>;
+/// #     pub struct Table; impl Table { pub fn columns(&self) -> Vec<&'static str> { vec![] } }
+/// #     #[macro_export]
+/// #     macro_rules! parse_column_impl { ($df:expr, $name:expr, $ty:ident, $value:expr, $schema:expr) => {}; }
+/// #     pub use parse_column_impl as parse_column;
+/// #     pub use parse_column_impl as parse_column_primitive;
+/// #     pub trait FromDataFrames: Sized {
+/// #         fn from_dfs(&mut self, dfs: HashMap<Datatype, DataFrame>, schemas: &HashMap<Datatype, Table>) -> Result<&mut Self, CollectError>;
 /// #     }
 /// # }
 /// use cryo_freeze::*;
@@ -268,6 +274,8 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
 
     let name = &input.ident;
 
+    let datatype = quote!(Datatype::#name);
+
     let field_names_and_types: Vec<_> =
         input.fields.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect();
 
@@ -280,38 +288,38 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
             let field_name_str = quote!(#name).to_string();
             match quote!(#ty).to_string().as_str() {
                 "Vec < u32 >" | "Vec < Option < u32 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, u32);
+                    parse_column_primitive!(df, #field_name_str, u32, self.#name, schema);
                 },
                 "Vec < u64 >" | "Vec < Option < u64 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, u64);
+                    parse_column_primitive!(df, #field_name_str, u64, self.#name, schema);
                 },
                 "Vec < i32 >" | "Vec < Option < i32 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, i32);
+                    parse_column_primitive!(df, #field_name_str, i32, self.#name, schema);
                 },
                 "Vec < i64 >" | "Vec < Option < i64 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, i64);
+                    parse_column_primitive!(df, #field_name_str, i64, self.#name, schema);
                 },
                 "Vec < f32 >" | "Vec < Option < f32 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, f32);
+                    parse_column_primitive!(df, #field_name_str, f32, self.#name, schema);
                 },
                 "Vec < f64 >" | "Vec < Option < f64 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, f64);
+                    parse_column_primitive!(df, #field_name_str, f64, self.#name, schema);
                 },
                 "Vec < String >" | "Vec < Option < String > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, str);
+                    parse_column_primitive!(df, #field_name_str, str, self.#name, schema);
                 },
                 "Vec < bool >" | "Vec < Option < bool > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, bool);
+                    parse_column_primitive!(df, #field_name_str, bool, self.#name, schema);
                 },
                 // Handle U256/I256 types with binary column name fallback
                 "Vec < U256 >" | "Vec < Option < U256 > >" => quote! {
-                    parse_column!(result, #name, #field_name_str, df, U256);
+                    parse_column!(df, #field_name_str, U256, self.#name, schema);
                 },
                 "Vec < I256 >" | "Vec < Option < I256 > >" => quote! {
-                    parse_column!(result, #name, #field_name_str, df, I256);
+                    parse_column!(df, #field_name_str, I256, self.#name, schema);
                 },
                 "Vec < RawBytes >" | "Vec < Option < RawBytes > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, binary);
+                    parse_column_primitive!(df, #field_name_str, binary, self.#name, schema);
                 },
                 _ => quote! {
                     // Handle unsupported types - for now, just set to default
@@ -324,21 +332,22 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         impl FromDataFrames for #name {
             fn from_dfs(
+                &mut self,
                 dfs: std::collections::HashMap<Datatype, DataFrame>,
-                datatype: &Datatype,
-            ) -> Result<Self, CollectError> {
-                use cryo_freeze::{parse_column, parse_column_primitive, FromBinaryVec, OptionVec, RawBytes};
+                schemas: &std::collections::HashMap<Datatype, Table>,
+            ) -> Result<&mut Self, CollectError> {
+                let datatype = #datatype;
+                let schema = schemas.get(&datatype).expect("schema not provided");
 
-                let df = dfs.get(datatype).ok_or_else(|| {
+                let df = dfs.get(&datatype).ok_or_else(|| {
                     CollectError::PolarsError(polars::prelude::PolarsError::ColumnNotFound("dataframe not found".into()))
                 })?;
 
-                let mut result = Self::default();
-                result.n_rows = df.height() as u64;
+                self.n_rows = df.height() as u64;
 
                 #(#field_population)*
 
-                Ok(result)
+                Ok(self)
             }
         }
     };

@@ -10,7 +10,7 @@ pub mod sources;
 
 /// column data specification
 pub mod columns;
-pub use columns::{ColumnData, Dataset, ToDataFrames};
+pub use columns::{ColumnData, Dataset, FromDataFrames, ToDataFrames};
 
 /// partitions
 pub mod partitions;

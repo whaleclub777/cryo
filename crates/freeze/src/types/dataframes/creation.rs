@@ -32,7 +32,7 @@ macro_rules! with_column {
 #[macro_export]
 macro_rules! parse_column_primitive {
     // Special handling for String since we need to convert &str to String
-    ($result:expr, $field:ident, $column_name:expr, $df:expr, str) => {
+    ($df:expr, $column_name:expr, str, $field:expr, $schema:expr) => {
         let option_vec = {
             let series = $df.column($column_name).map_err(CollectError::PolarsError)?;
             let str_array = series.str().map_err(CollectError::PolarsError)?;
@@ -41,9 +41,9 @@ macro_rules! parse_column_primitive {
 
             OptionVec::Option(values)
         };
-        $result.$field = option_vec.try_into()?;
+        $field = option_vec.try_into()?;
     };
-    ($result:expr, $field:ident, $column_name:expr, $df:expr, $polars_type:ident) => {
+    ($df:expr, $column_name:expr, $polars_type:ident, $field:expr, $schema:expr) => {
         let option_vec = {
             let series = $df.column($column_name).map_err(CollectError::PolarsError)?;
             let array = series.$polars_type().map_err(CollectError::PolarsError)?;
@@ -51,17 +51,17 @@ macro_rules! parse_column_primitive {
 
             OptionVec::Option(values)
         };
-        $result.$field = option_vec.try_into()?;
+        $field = option_vec.try_into()?;
     };
 }
 
 /// parse a complex type column from DataFrame and populate struct field (for U256/I256)
 #[macro_export]
 macro_rules! parse_column {
-    ($result:expr, $field:ident, $field_name_str:expr, $df:expr, U256) => {
+    ($df:expr, $column_name:expr, U256, $field:expr, $schema:expr) => {
         // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
-        let u256_column_name = format!("{}_u256binary", $field_name_str);
-        let binary_column_name = format!("{}_binary", $field_name_str);
+        let u256_column_name = format!("{}_u256binary", $column_name);
+        let binary_column_name = format!("{}_binary", $column_name);
 
         let column_result =
             $df.column(&u256_column_name).or_else(|_| $df.column(&binary_column_name));
@@ -71,17 +71,17 @@ macro_rules! parse_column {
                 let binary_data = series.binary().map_err(CollectError::PolarsError)?;
                 let raw_data: Vec<Option<RawBytes>> =
                     binary_data.into_iter().map(|opt| opt.map(|bytes| bytes.to_vec())).collect();
-                $result.$field = $crate::FromBinaryVec::from_binary_vec(raw_data)?;
+                $field = $crate::FromBinaryVec::from_binary_vec(raw_data)?;
             }
             Err(_) => {
-                $result.$field = vec![];
+                $field = vec![];
             }
         }
     };
-    ($result:expr, $field:ident, $field_name_str:expr, $df:expr, I256) => {
+    ($df:expr, $column_name:expr, I256, $field:expr, $schema:expr) => {
         // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
-        let i256_column_name = format!("{}_i256binary", $field_name_str);
-        let binary_column_name = format!("{}_binary", $field_name_str);
+        let i256_column_name = format!("{}_i256binary", $column_name);
+        let binary_column_name = format!("{}_binary", $column_name);
 
         let column_result =
             $df.column(&i256_column_name).or_else(|_| $df.column(&binary_column_name));
@@ -91,10 +91,10 @@ macro_rules! parse_column {
                 let binary_data = series.binary().map_err(CollectError::PolarsError)?;
                 let raw_data: Vec<Option<RawBytes>> =
                     binary_data.into_iter().map(|opt| opt.map(|bytes| bytes.to_vec())).collect();
-                $result.$field = $crate::FromBinaryVec::from_binary_vec(raw_data)?;
+                $field = $crate::FromBinaryVec::from_binary_vec(raw_data)?;
             }
             Err(_) => {
-                $result.$field = vec![];
+                $field = vec![];
             }
         }
     };

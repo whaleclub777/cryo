@@ -67,12 +67,13 @@ pub trait ToDataFrames: Sized {
 }
 
 /// converts from dataframes
-pub trait FromDataFrames: Sized + Default {
+pub trait FromDataFrames: Sized {
     /// create struct from dataframe data
     fn from_dfs(
+        &mut self,
         dfs: HashMap<Datatype, DataFrame>,
-        datatype: &Datatype,
-    ) -> Result<Self, CollectError>;
+        datatype: &HashMap<Datatype, Table>,
+    ) -> Result<&mut Self, CollectError>;
 }
 
 /// Dataset manages collection and management of a particular datatype
