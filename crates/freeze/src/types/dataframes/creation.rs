@@ -1,7 +1,80 @@
 use alloy::dyn_abi::DynSolValue;
 use polars::prelude::Column;
 
-use crate::{err, CollectError, ColumnType, DynValues, RawBytes, TableConfig};
+use crate::{err, CollectError, ColumnType, DynValues, OptionVec, RawBytes, TableConfig};
+
+/// Parse binary column data into OptionVec<U256>
+pub fn parse_binary_to_u256_option_vec<'a>(
+    binary_data: impl Iterator<Item = Option<&'a [u8]>>,
+) -> OptionVec<alloy::primitives::U256> {
+    let mut has_none = false;
+    let values: Vec<Option<alloy::primitives::U256>> = binary_data
+        .map(|opt_bytes| {
+            match opt_bytes {
+                Some(bytes) => {
+                    if bytes.len() >= 32 {
+                        Some(alloy::primitives::U256::from_be_bytes(
+                            bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
+                        ))
+                    } else {
+                        // Pad with zeros if needed
+                        let mut padded = [0u8; 32];
+                        let start_idx = 32 - bytes.len();
+                        padded[start_idx..].copy_from_slice(bytes);
+                        Some(alloy::primitives::U256::from_be_bytes(padded))
+                    }
+                }
+                None => {
+                    has_none = true;
+                    None
+                }
+            }
+        })
+        .collect();
+
+    if has_none {
+        OptionVec::Option(values)
+    } else {
+        OptionVec::Some(values.into_iter().map(|v| v.unwrap_or_default()).collect())
+    }
+}
+
+/// Parse binary column data into OptionVec<I256>
+pub fn parse_binary_to_i256_option_vec<'a>(
+    binary_data: impl Iterator<Item = Option<&'a [u8]>>,
+) -> OptionVec<alloy::primitives::I256> {
+    let mut has_none = false;
+    let values: Vec<Option<alloy::primitives::I256>> = binary_data
+        .map(|opt_bytes| {
+            match opt_bytes {
+                Some(bytes) => {
+                    if bytes.len() >= 32 {
+                        let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
+                        let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
+                        Some(alloy::primitives::I256::from_raw(u256_val))
+                    } else {
+                        // Pad with zeros if needed
+                        let mut padded = [0u8; 32];
+                        let start_idx = 32 - bytes.len();
+                        padded[start_idx..].copy_from_slice(bytes);
+                        let u256_val = alloy::primitives::U256::from_be_bytes(padded);
+                        Some(alloy::primitives::I256::from_raw(u256_val))
+                    }
+                }
+                None => {
+                    has_none = true;
+                    None
+                }
+            }
+        })
+        .collect();
+
+    if has_none {
+        OptionVec::Option(values)
+    } else {
+        OptionVec::Some(values.into_iter().map(|v| v.unwrap_or_default()).collect())
+    }
+}
 
 /// convert a Vec to Column and add to Vec<Column>
 #[macro_export]
@@ -84,26 +157,8 @@ macro_rules! parse_column {
             Ok(series) => {
                 let binary_data = series.binary()
                     .map_err(CollectError::PolarsError)?;
-                $result.$field = binary_data.into_iter()
-                    .map(|opt_bytes| {
-                        match opt_bytes {
-                            Some(bytes) => {
-                                if bytes.len() >= 32 {
-                                    alloy::primitives::U256::from_be_bytes(
-                                        bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
-                                    )
-                                } else {
-                                    // Pad with zeros if needed
-                                    let mut padded = [0u8; 32];
-                                    let start_idx = 32 - bytes.len();
-                                    padded[start_idx..].copy_from_slice(bytes);
-                                    alloy::primitives::U256::from_be_bytes(padded)
-                                }
-                            }
-                            None => alloy::primitives::U256::ZERO,
-                        }
-                    })
-                    .collect();
+                let option_vec = $crate::parse_binary_to_u256_option_vec(binary_data.into_iter());
+                $result.$field = option_vec.try_into().unwrap_or_else(|_| vec![]);
             }
             Err(_) => {
                 $result.$field = vec![];
@@ -122,27 +177,8 @@ macro_rules! parse_column {
             Ok(series) => {
                 let binary_data = series.binary()
                     .map_err(CollectError::PolarsError)?;
-                $result.$field = binary_data.into_iter()
-                    .map(|opt_bytes| {
-                        match opt_bytes {
-                            Some(bytes) => {
-                                if bytes.len() >= 32 {
-                                    let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
-                                    let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
-                                    alloy::primitives::I256::from_raw(u256_val)
-                                } else {
-                                    // Pad with zeros if needed
-                                    let mut padded = [0u8; 32];
-                                    let start_idx = 32 - bytes.len();
-                                    padded[start_idx..].copy_from_slice(bytes);
-                                    let u256_val = alloy::primitives::U256::from_be_bytes(padded);
-                                    alloy::primitives::I256::from_raw(u256_val)
-                                }
-                            }
-                            None => alloy::primitives::I256::ZERO,
-                        }
-                    })
-                    .collect();
+                let option_vec = $crate::parse_binary_to_i256_option_vec(binary_data.into_iter());
+                $result.$field = option_vec.try_into().unwrap_or_else(|_| vec![]);
             }
             Err(_) => {
                 $result.$field = vec![];
@@ -161,23 +197,8 @@ macro_rules! parse_column {
             Ok(series) => {
                 let binary_data = series.binary()
                     .map_err(CollectError::PolarsError)?;
-                $result.$field = binary_data.into_iter()
-                    .map(|opt_bytes| {
-                        opt_bytes.map(|bytes| {
-                            if bytes.len() >= 32 {
-                                alloy::primitives::U256::from_be_bytes(
-                                    bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
-                                )
-                            } else {
-                                // Pad with zeros if needed
-                                let mut padded = [0u8; 32];
-                                let start_idx = 32 - bytes.len();
-                                padded[start_idx..].copy_from_slice(bytes);
-                                alloy::primitives::U256::from_be_bytes(padded)
-                            }
-                        })
-                    })
-                    .collect();
+                let option_vec = $crate::parse_binary_to_u256_option_vec(binary_data.into_iter());
+                $result.$field = option_vec.try_into().unwrap_or_else(|_| vec![]);
             }
             Err(_) => {
                 $result.$field = vec![];
@@ -196,24 +217,8 @@ macro_rules! parse_column {
             Ok(series) => {
                 let binary_data = series.binary()
                     .map_err(CollectError::PolarsError)?;
-                $result.$field = binary_data.into_iter()
-                    .map(|opt_bytes| {
-                        opt_bytes.map(|bytes| {
-                            if bytes.len() >= 32 {
-                                let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
-                                let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
-                                alloy::primitives::I256::from_raw(u256_val)
-                            } else {
-                                // Pad with zeros if needed
-                                let mut padded = [0u8; 32];
-                                let start_idx = 32 - bytes.len();
-                                padded[start_idx..].copy_from_slice(bytes);
-                                let u256_val = alloy::primitives::U256::from_be_bytes(padded);
-                                alloy::primitives::I256::from_raw(u256_val)
-                            }
-                        })
-                    })
-                    .collect();
+                let option_vec = $crate::parse_binary_to_i256_option_vec(binary_data.into_iter());
+                $result.$field = option_vec.try_into().unwrap_or_else(|_| vec![]);
             }
             Err(_) => {
                 $result.$field = vec![];

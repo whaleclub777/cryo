@@ -95,6 +95,31 @@ impl<T> OptionVec<T> {
     }
 }
 
+impl<T> TryInto<Vec<T>> for OptionVec<T>
+where
+    T: Default,
+{
+    type Error = ();
+
+    fn try_into(self) -> Result<Vec<T>, Self::Error> {
+        match self {
+            OptionVec::Some(v) => Ok(v),
+            OptionVec::Option(v) => Ok(v.into_iter().map(|opt| opt.unwrap_or_default()).collect()),
+        }
+    }
+}
+
+impl<T> TryInto<Vec<Option<T>>> for OptionVec<T> {
+    type Error = ();
+
+    fn try_into(self) -> Result<Vec<Option<T>>, Self::Error> {
+        match self {
+            OptionVec::Some(v) => Ok(v.into_iter().map(Some).collect()),
+            OptionVec::Option(v) => Ok(v),
+        }
+    }
+}
+
 /// A collection of dynamic values that can be used in a DataFrame column.
 pub enum DynValues {
     /// int
