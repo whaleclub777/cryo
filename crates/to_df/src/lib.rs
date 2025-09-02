@@ -282,67 +282,36 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
         .map(|(name, ty)| {
             let field_name_str = quote!(#name).to_string();
             match quote!(#ty).to_string().as_str() {
-                "Vec < u32 >" => quote! {
+                "Vec < u32 >" | "Vec < Option < u32 > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, u32);
                 },
-                "Vec < u64 >" => quote! {
+                "Vec < u64 >" | "Vec < Option < u64 > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, u64);
                 },
-                "Vec < i32 >" => quote! {
+                "Vec < i32 >" | "Vec < Option < i32 > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, i32);
                 },
-                "Vec < i64 >" => quote! {
+                "Vec < i64 >" | "Vec < Option < i64 > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, i64);
                 },
-                "Vec < f32 >" => quote! {
+                "Vec < f32 >" | "Vec < Option < f32 > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, f32);
                 },
-                "Vec < f64 >" => quote! {
+                "Vec < f64 >" | "Vec < Option < f64 > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, f64);
                 },
-                "Vec < String >" => quote! {
+                "Vec < String >" | "Vec < Option < String > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, str);
                 },
-                "Vec < bool >" => quote! {
+                "Vec < bool >" | "Vec < Option < bool > >" => quote! {
                     parse_column_primitive!(result, #name, #field_name_str, df, bool);
                 },
-                // Handle Option types
-                "Vec < Option < u32 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, u32, Option);
-                },
-                "Vec < Option < u64 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, u64, Option);
-                },
-                "Vec < Option < i32 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, i32, Option);
-                },
-                "Vec < Option < i64 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, i64, Option);
-                },
-                "Vec < Option < f32 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, f32, Option);
-                },
-                "Vec < Option < f64 > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, f64, Option);
-                },
-                "Vec < Option < String > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, str, Option);
-                },
-                "Vec < Option < bool > >" => quote! {
-                    parse_column_primitive!(result, #name, #field_name_str, df, bool, Option);
-                },
                 // Handle U256/I256 types with binary column name fallback
-                "Vec < U256 >" => quote! {
+                "Vec < U256 >" | "Vec < Option < U256 > >" => quote! {
                     parse_column!(result, #name, #field_name_str, df, U256);
                 },
-                "Vec < I256 >" => quote! {
+                "Vec < I256 >" | "Vec < Option < I256 > >" => quote! {
                     parse_column!(result, #name, #field_name_str, df, I256);
-                },
-                "Vec < Option < U256 > >" => quote! {
-                    parse_column!(result, #name, #field_name_str, df, U256, Option);
-                },
-                "Vec < Option < I256 > >" => quote! {
-                    parse_column!(result, #name, #field_name_str, df, I256, Option);
                 },
                 _ => quote! {
                     // Handle unsupported types - for now, just set to default
@@ -358,7 +327,7 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
                 dfs: std::collections::HashMap<Datatype, DataFrame>,
                 datatype: &Datatype,
             ) -> Result<Self, CollectError> {
-                use cryo_freeze::{parse_column, parse_column_primitive};
+                use cryo_freeze::{parse_column, parse_column_primitive, FromBinaryVec, OptionVec, RawBytes};
                 
                 let df = dfs.get(datatype).ok_or_else(|| {
                     CollectError::PolarsError(polars::prelude::PolarsError::ColumnNotFound("dataframe not found".into()))

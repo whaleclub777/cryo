@@ -53,7 +53,7 @@ pub use chunks::{
     AddressChunk, BlockChunk, CallDataChunk, Chunk, ChunkData, ChunkStats, RawBytes, SlotChunk,
     Subchunk, TopicChunk, TransactionChunk,
 };
-pub use conversions::{bytes_to_u32, ToVecHex, ToVecU8};
+pub use conversions::{bytes_to_u32, FromBinaryVec, ToVecHex, ToVecU8};
 pub use dataframes::*;
 pub use datatypes::*;
 pub use files::{ColumnEncoding, FileFormat, FileOutput, SubDir};

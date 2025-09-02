@@ -46,6 +46,16 @@ fn test_binary_column_fallback() {
     test_binary_fallback().unwrap();
 }
 
+#[test]
+fn test_option_vec_error_handling() {
+    test_option_vec_errors().unwrap();
+}
+
+#[test]
+fn test_from_binary_vec_trait() {
+    test_from_binary_vec().unwrap();
+}
+
 #[allow(dead_code)]
 pub fn test_from_dataframes() -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing FromDataFrames derive macro...");
@@ -174,5 +184,81 @@ pub fn test_binary_fallback() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(result.chain_id, chain_id_data);
     
     println!("Binary column fallback works correctly!");
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn test_option_vec_errors() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Testing OptionVec error handling...");
+    
+    // Test that OptionVec with None values fails when converting to Vec<T>
+    use cryo_freeze::OptionVec;
+    
+    // Create an OptionVec with Some values - should succeed
+    let option_vec_some = OptionVec::Some(vec![1u32, 2, 3]);
+    let result: Result<Vec<u32>, _> = option_vec_some.try_into();
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), vec![1u32, 2, 3]);
+    
+    // Create an OptionVec with None values - should fail when converting to Vec<T>
+    let option_vec_with_none = OptionVec::Option(vec![Some(1u32), None, Some(3)]);
+    let result: Result<Vec<u32>, _> = option_vec_with_none.try_into();
+    assert!(result.is_err());
+    
+    // But should succeed when converting to Vec<Option<T>>
+    let option_vec_with_none = OptionVec::Option(vec![Some(1u32), None, Some(3)]);
+    let result: Result<Vec<Option<u32>>, _> = option_vec_with_none.try_into();
+    assert!(result.is_ok());
+    assert_eq!(result.unwrap(), vec![Some(1u32), None, Some(3)]);
+    
+    println!("OptionVec error handling works correctly!");
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub fn test_from_binary_vec() -> Result<(), Box<dyn std::error::Error>> {
+    println!("Testing FromBinaryVec trait...");
+    
+    use cryo_freeze::FromBinaryVec;
+    
+    // Create test U256 binary data
+    let u256_val = U256::from(12345u64);
+    let u256_binary = u256_val.to_be_bytes_vec();
+    
+    // Test Vec<U256> - should succeed when all values are present
+    let data_complete = vec![Some(u256_binary.clone()), Some(u256_binary.clone())];
+    let result: Result<Vec<U256>, _> = Vec::from_binary_vec(data_complete);
+    assert!(result.is_ok());
+    let values = result.unwrap();
+    assert_eq!(values.len(), 2);
+    assert_eq!(values[0], u256_val);
+    assert_eq!(values[1], u256_val);
+    
+    // Test Vec<U256> - should fail when there's a None value
+    let data_with_none = vec![Some(u256_binary.clone()), None];
+    let result: Result<Vec<U256>, _> = Vec::from_binary_vec(data_with_none);
+    assert!(result.is_err());
+    
+    // Test Vec<Option<U256>> - should succeed even with None values
+    let data_with_none = vec![Some(u256_binary.clone()), None, Some(u256_binary.clone())];
+    let result: Result<Vec<Option<U256>>, _> = Vec::from_binary_vec(data_with_none);
+    assert!(result.is_ok());
+    let values = result.unwrap();
+    assert_eq!(values.len(), 3);
+    assert_eq!(values[0], Some(u256_val));
+    assert_eq!(values[1], None);
+    assert_eq!(values[2], Some(u256_val));
+    
+    // Test I256 as well
+    let i256_val = I256::from_raw(U256::from(67890u64));
+    let i256_binary = i256_val.to_be_bytes::<32>().to_vec();
+    
+    let data_i256 = vec![Some(i256_binary.clone())];
+    let result: Result<Vec<I256>, _> = Vec::from_binary_vec(data_i256);
+    assert!(result.is_ok());
+    let values = result.unwrap();
+    assert_eq!(values[0], i256_val);
+    
+    println!("FromBinaryVec trait works correctly!");
     Ok(())
 }

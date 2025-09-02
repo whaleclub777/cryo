@@ -99,18 +99,29 @@ impl<T> TryInto<Vec<T>> for OptionVec<T>
 where
     T: Default,
 {
-    type Error = ();
+    type Error = crate::CollectError;
 
     fn try_into(self) -> Result<Vec<T>, Self::Error> {
         match self {
             OptionVec::Some(v) => Ok(v),
-            OptionVec::Option(v) => Ok(v.into_iter().map(|opt| opt.unwrap_or_default()).collect()),
+            OptionVec::Option(v) => {
+                let mut result = Vec::with_capacity(v.len());
+                for (i, opt) in v.into_iter().enumerate() {
+                    match opt {
+                        Some(value) => result.push(value),
+                        None => return Err(crate::CollectError::CollectError(
+                            format!("Missing value at index {}", i)
+                        )),
+                    }
+                }
+                Ok(result)
+            }
         }
     }
 }
 
 impl<T> TryInto<Vec<Option<T>>> for OptionVec<T> {
-    type Error = ();
+    type Error = crate::CollectError;
 
     fn try_into(self) -> Result<Vec<Option<T>>, Self::Error> {
         match self {

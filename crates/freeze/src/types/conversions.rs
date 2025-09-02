@@ -99,3 +99,121 @@ impl ToVecHex for OptionVec<RawBytes> {
         }
     }
 }
+
+/// Trait for converting binary data to specific types
+pub trait FromBinaryVec<T> {
+    /// Convert from Vec<Option<RawBytes>> to Self
+    fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError>
+    where
+        Self: Sized;
+}
+
+/// Implementation for Vec<U256>
+impl FromBinaryVec<U256> for Vec<U256> {
+    fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
+        let mut result = Vec::with_capacity(data.len());
+        for (i, opt_bytes) in data.into_iter().enumerate() {
+            match opt_bytes {
+                Some(bytes) => {
+                    if bytes.len() >= 32 {
+                        result.push(U256::from_be_bytes(
+                            bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
+                        ));
+                    } else {
+                        // Pad with zeros if needed
+                        let mut padded = [0u8; 32];
+                        let start_idx = 32 - bytes.len();
+                        padded[start_idx..].copy_from_slice(&bytes);
+                        result.push(U256::from_be_bytes(padded));
+                    }
+                }
+                None => return Err(CollectError::CollectError(
+                    format!("Missing binary value at index {}", i)
+                )),
+            }
+        }
+        Ok(result)
+    }
+}
+
+/// Implementation for Vec<Option<U256>>
+impl FromBinaryVec<U256> for Vec<Option<U256>> {
+    fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
+        let mut result = Vec::with_capacity(data.len());
+        for opt_bytes in data {
+            match opt_bytes {
+                Some(bytes) => {
+                    if bytes.len() >= 32 {
+                        result.push(Some(U256::from_be_bytes(
+                            bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
+                        )));
+                    } else {
+                        // Pad with zeros if needed
+                        let mut padded = [0u8; 32];
+                        let start_idx = 32 - bytes.len();
+                        padded[start_idx..].copy_from_slice(&bytes);
+                        result.push(Some(U256::from_be_bytes(padded)));
+                    }
+                }
+                None => result.push(None),
+            }
+        }
+        Ok(result)
+    }
+}
+
+/// Implementation for Vec<I256>
+impl FromBinaryVec<I256> for Vec<I256> {
+    fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
+        let mut result = Vec::with_capacity(data.len());
+        for (i, opt_bytes) in data.into_iter().enumerate() {
+            match opt_bytes {
+                Some(bytes) => {
+                    if bytes.len() >= 32 {
+                        let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
+                        let u256_val = U256::from_be_bytes(u256_bytes);
+                        result.push(I256::from_raw(u256_val));
+                    } else {
+                        // Pad with zeros if needed
+                        let mut padded = [0u8; 32];
+                        let start_idx = 32 - bytes.len();
+                        padded[start_idx..].copy_from_slice(&bytes);
+                        let u256_val = U256::from_be_bytes(padded);
+                        result.push(I256::from_raw(u256_val));
+                    }
+                }
+                None => return Err(CollectError::CollectError(
+                    format!("Missing binary value at index {}", i)
+                )),
+            }
+        }
+        Ok(result)
+    }
+}
+
+/// Implementation for Vec<Option<I256>>
+impl FromBinaryVec<I256> for Vec<Option<I256>> {
+    fn from_binary_vec(data: Vec<Option<RawBytes>>) -> Result<Self, CollectError> {
+        let mut result = Vec::with_capacity(data.len());
+        for opt_bytes in data {
+            match opt_bytes {
+                Some(bytes) => {
+                    if bytes.len() >= 32 {
+                        let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
+                        let u256_val = U256::from_be_bytes(u256_bytes);
+                        result.push(Some(I256::from_raw(u256_val)));
+                    } else {
+                        // Pad with zeros if needed
+                        let mut padded = [0u8; 32];
+                        let start_idx = 32 - bytes.len();
+                        padded[start_idx..].copy_from_slice(&bytes);
+                        let u256_val = U256::from_be_bytes(padded);
+                        result.push(Some(I256::from_raw(u256_val)));
+                    }
+                }
+                None => result.push(None),
+            }
+        }
+        Ok(result)
+    }
+}
