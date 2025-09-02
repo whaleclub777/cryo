@@ -109,7 +109,7 @@ where
                 .enumerate()
                 .map(|(i, opt)| {
                     opt.ok_or_else(|| {
-                        crate::CollectError::CollectError(format!("Missing value at index {}", i))
+                        crate::CollectError::CollectError(format!("Missing value at index {i}"))
                     })
                 })
                 .collect::<Result<Vec<_>, _>>(),

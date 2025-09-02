@@ -174,9 +174,11 @@ impl FromBinaryVec for Vec<U256> {
                 Some(bytes) => {
                     result.push(U256::from_binary(bytes)?);
                 }
-                None => return Err(CollectError::CollectError(
-                    format!("Missing binary value at index {}", i)
-                )),
+                None => {
+                    return Err(CollectError::CollectError(format!(
+                        "Missing binary value at index {i}"
+                    )))
+                }
             }
         }
         Ok(result)
@@ -208,9 +210,11 @@ impl FromBinaryVec for Vec<I256> {
                 Some(bytes) => {
                     result.push(I256::from_binary(bytes)?);
                 }
-                None => return Err(CollectError::CollectError(
-                    format!("Missing binary value at index {}", i)
-                )),
+                None => {
+                    return Err(CollectError::CollectError(format!(
+                        "Missing binary value at index {i}"
+                    )))
+                }
             }
         }
         Ok(result)
