@@ -189,7 +189,8 @@ pub fn test_negative_i256_from_dataframes() -> Result<(), Box<dyn std::error::Er
     let mut dfs = HashMap::new();
     let mut schemas = HashMap::new();
     dfs.insert(Datatype::BalanceDiffs, df);
-    schemas.insert(Datatype::BalanceDiffs, Datatype::BalanceDiffs.default_table_schema(get_config()));
+    schemas
+        .insert(Datatype::BalanceDiffs, Datatype::BalanceDiffs.default_table_schema(get_config()));
 
     // Test the conversion
     let mut result = BalanceDiffs::default();
@@ -240,7 +241,8 @@ pub fn test_binary_fallback() -> Result<(), Box<dyn std::error::Error>> {
     let mut dfs = HashMap::new();
     let mut schemas = HashMap::new();
     dfs.insert(Datatype::BalanceReads, df);
-    schemas.insert(Datatype::BalanceReads, Datatype::BalanceReads.default_table_schema(get_config()));
+    schemas
+        .insert(Datatype::BalanceReads, Datatype::BalanceReads.default_table_schema(get_config()));
 
     // Call from_dfs - this should successfully use the _binary fallback columns
     let mut result = BalanceReads::default();

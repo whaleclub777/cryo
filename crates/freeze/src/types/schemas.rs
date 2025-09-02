@@ -241,7 +241,8 @@ pub enum SchemaError {
 impl Datatype {
     /// get default table schema for a particular datatype
     pub fn default_table_schema(&self, config: TableConfig) -> Table {
-        let column_types = self.column_types().into_iter().map(|(k, v)| (k.to_string(), v)).collect();
+        let column_types =
+            self.column_types().into_iter().map(|(k, v)| (k.to_string(), v)).collect();
         Table {
             datatype: *self,
             sort_columns: None,
