@@ -420,6 +420,155 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
                         .into_iter()
                         .collect();
                 },
+                // Handle U256 types with binary column name fallback
+                "Vec < U256 >" => quote! {
+                    // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
+                    let u256_column_name = format!("{}_u256binary", #field_name_str);
+                    let binary_column_name = format!("{}_binary", #field_name_str);
+                    
+                    let column_result = df.column(&u256_column_name)
+                        .or_else(|_| df.column(&binary_column_name));
+                    
+                    match column_result {
+                        Ok(series) => {
+                            let binary_data = series.binary()
+                                .map_err(CollectError::PolarsError)?;
+                            result.#name = binary_data.into_iter()
+                                .map(|opt_bytes| {
+                                    match opt_bytes {
+                                        Some(bytes) => {
+                                            if bytes.len() >= 32 {
+                                                alloy::primitives::U256::from_be_bytes(
+                                                    bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
+                                                )
+                                            } else {
+                                                // Pad with zeros if needed
+                                                let mut padded = [0u8; 32];
+                                                let start_idx = 32 - bytes.len();
+                                                padded[start_idx..].copy_from_slice(bytes);
+                                                alloy::primitives::U256::from_be_bytes(padded)
+                                            }
+                                        }
+                                        None => alloy::primitives::U256::ZERO,
+                                    }
+                                })
+                                .collect();
+                        }
+                        Err(_) => {
+                            result.#name = vec![];
+                        }
+                    }
+                },
+                "Vec < I256 >" => quote! {
+                    // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
+                    let i256_column_name = format!("{}_i256binary", #field_name_str);
+                    let binary_column_name = format!("{}_binary", #field_name_str);
+                    
+                    let column_result = df.column(&i256_column_name)
+                        .or_else(|_| df.column(&binary_column_name));
+                    
+                    match column_result {
+                        Ok(series) => {
+                            let binary_data = series.binary()
+                                .map_err(CollectError::PolarsError)?;
+                            result.#name = binary_data.into_iter()
+                                .map(|opt_bytes| {
+                                    match opt_bytes {
+                                        Some(bytes) => {
+                                            if bytes.len() >= 32 {
+                                                let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
+                                                let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
+                                                alloy::primitives::I256::from_raw(u256_val)
+                                            } else {
+                                                // Pad with zeros if needed
+                                                let mut padded = [0u8; 32];
+                                                let start_idx = 32 - bytes.len();
+                                                padded[start_idx..].copy_from_slice(bytes);
+                                                let u256_val = alloy::primitives::U256::from_be_bytes(padded);
+                                                alloy::primitives::I256::from_raw(u256_val)
+                                            }
+                                        }
+                                        None => alloy::primitives::I256::ZERO,
+                                    }
+                                })
+                                .collect();
+                        }
+                        Err(_) => {
+                            result.#name = vec![];
+                        }
+                    }
+                },
+                "Vec < Option < U256 > >" => quote! {
+                    // Try to read from <field_name>_u256binary first, then fall back to <field_name>_binary
+                    let u256_column_name = format!("{}_u256binary", #field_name_str);
+                    let binary_column_name = format!("{}_binary", #field_name_str);
+                    
+                    let column_result = df.column(&u256_column_name)
+                        .or_else(|_| df.column(&binary_column_name));
+                    
+                    match column_result {
+                        Ok(series) => {
+                            let binary_data = series.binary()
+                                .map_err(CollectError::PolarsError)?;
+                            result.#name = binary_data.into_iter()
+                                .map(|opt_bytes| {
+                                    opt_bytes.map(|bytes| {
+                                        if bytes.len() >= 32 {
+                                            alloy::primitives::U256::from_be_bytes(
+                                                bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32])
+                                            )
+                                        } else {
+                                            // Pad with zeros if needed
+                                            let mut padded = [0u8; 32];
+                                            let start_idx = 32 - bytes.len();
+                                            padded[start_idx..].copy_from_slice(bytes);
+                                            alloy::primitives::U256::from_be_bytes(padded)
+                                        }
+                                    })
+                                })
+                                .collect();
+                        }
+                        Err(_) => {
+                            result.#name = vec![];
+                        }
+                    }
+                },
+                "Vec < Option < I256 > >" => quote! {
+                    // Try to read from <field_name>_i256binary first, then fall back to <field_name>_binary
+                    let i256_column_name = format!("{}_i256binary", #field_name_str);
+                    let binary_column_name = format!("{}_binary", #field_name_str);
+                    
+                    let column_result = df.column(&i256_column_name)
+                        .or_else(|_| df.column(&binary_column_name));
+                    
+                    match column_result {
+                        Ok(series) => {
+                            let binary_data = series.binary()
+                                .map_err(CollectError::PolarsError)?;
+                            result.#name = binary_data.into_iter()
+                                .map(|opt_bytes| {
+                                    opt_bytes.map(|bytes| {
+                                        if bytes.len() >= 32 {
+                                            let u256_bytes = bytes[..32].try_into().unwrap_or_else(|_| [0u8; 32]);
+                                            let u256_val = alloy::primitives::U256::from_be_bytes(u256_bytes);
+                                            alloy::primitives::I256::from_raw(u256_val)
+                                        } else {
+                                            // Pad with zeros if needed
+                                            let mut padded = [0u8; 32];
+                                            let start_idx = 32 - bytes.len();
+                                            padded[start_idx..].copy_from_slice(bytes);
+                                            let u256_val = alloy::primitives::U256::from_be_bytes(padded);
+                                            alloy::primitives::I256::from_raw(u256_val)
+                                        }
+                                    })
+                                })
+                                .collect();
+                        }
+                        Err(_) => {
+                            result.#name = vec![];
+                        }
+                    }
+                },
                 _ => quote! {
                     // Handle unsupported types - for now, just set to default
                     result.#name = vec![];
