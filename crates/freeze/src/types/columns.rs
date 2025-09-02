@@ -69,7 +69,7 @@ pub trait ToDataFrames: Sized {
 /// converts from dataframes
 pub trait FromDataFrames: Sized {
     /// create struct from dataframe data
-    fn from_dfs(
+    fn parse_dfs(
         &mut self,
         dfs: HashMap<Datatype, DataFrame>,
         datatype: &HashMap<Datatype, Table>,

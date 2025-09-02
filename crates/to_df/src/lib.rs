@@ -254,7 +254,7 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
 /// #     pub use parse_column_impl as parse_column;
 /// #     pub use parse_column_impl as parse_column_primitive;
 /// #     pub trait FromDataFrames: Sized {
-/// #         fn from_dfs(&mut self, dfs: HashMap<Datatype, DataFrame>, schemas: &HashMap<Datatype, Table>) -> Result<&mut Self, CollectError>;
+/// #         fn parse_dfs(&mut self, dfs: HashMap<Datatype, DataFrame>, schemas: &HashMap<Datatype, Table>) -> Result<&mut Self, CollectError>;
 /// #     }
 /// # }
 /// use cryo_freeze::*;
@@ -331,7 +331,7 @@ pub fn from_data_frames(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl FromDataFrames for #name {
-            fn from_dfs(
+            fn parse_dfs(
                 &mut self,
                 dfs: std::collections::HashMap<Datatype, DataFrame>,
                 schemas: &std::collections::HashMap<Datatype, Table>,

@@ -79,15 +79,15 @@ pub fn test_from_dataframes() -> Result<(), Box<dyn std::error::Error>> {
         Column::new("chain_id".into(), chain_id_data.clone()),
     ])?;
 
-    // Create input for from_dfs (using an existing datatype)
+    // Create input for parse_dfs (using an existing datatype)
     let mut dfs = HashMap::new();
     let mut schemas = HashMap::new();
     dfs.insert(Datatype::Blocks, df);
     schemas.insert(Datatype::Blocks, Datatype::Blocks.default_table_schema(get_config()));
 
     let mut result = Blocks::default();
-    // Call from_dfs
-    result.from_dfs(dfs, &schemas)?;
+    // Call parse_dfs
+    result.parse_dfs(dfs, &schemas)?;
 
     println!("Result n_rows: {}", result.n_rows);
     println!("Result field1: {:?}", result.field1);
@@ -132,15 +132,15 @@ pub fn test_u256_i256_from_dataframes() -> Result<(), Box<dyn std::error::Error>
         Column::new("chain_id".into(), chain_id_data.clone()),
     ])?;
 
-    // Create input for from_dfs
+    // Create input for parse_dfs
     let mut dfs = HashMap::new();
     let mut schemas = HashMap::new();
     dfs.insert(Datatype::Balances, df);
     schemas.insert(Datatype::Balances, Datatype::Balances.default_table_schema(get_config()));
 
-    // Call from_dfs
+    // Call parse_dfs
     let mut result = Balances::default();
-    result.from_dfs(dfs, &schemas)?;
+    result.parse_dfs(dfs, &schemas)?;
 
     println!("Result n_rows: {}", result.n_rows);
     println!("Result value_u256: {:?}", result.value_u256);
@@ -185,7 +185,7 @@ pub fn test_negative_i256_from_dataframes() -> Result<(), Box<dyn std::error::Er
         Column::new("chain_id".into(), chain_id_data.clone()),
     ])?;
 
-    // Create input for from_dfs
+    // Create input for parse_dfs
     let mut dfs = HashMap::new();
     let mut schemas = HashMap::new();
     dfs.insert(Datatype::BalanceDiffs, df);
@@ -194,7 +194,7 @@ pub fn test_negative_i256_from_dataframes() -> Result<(), Box<dyn std::error::Er
 
     // Test the conversion
     let mut result = BalanceDiffs::default();
-    result.from_dfs(dfs, &schemas)?;
+    result.parse_dfs(dfs, &schemas)?;
 
     // Verify the values
     assert_eq!(result.value_i256.len(), 2);
@@ -237,16 +237,16 @@ pub fn test_binary_fallback() -> Result<(), Box<dyn std::error::Error>> {
         Column::new("chain_id".into(), chain_id_data.clone()),
     ])?;
 
-    // Create input for from_dfs
+    // Create input for parse_dfs
     let mut dfs = HashMap::new();
     let mut schemas = HashMap::new();
     dfs.insert(Datatype::BalanceReads, df);
     schemas
         .insert(Datatype::BalanceReads, Datatype::BalanceReads.default_table_schema(get_config()));
 
-    // Call from_dfs - this should successfully use the _binary fallback columns
+    // Call parse_dfs - this should successfully use the _binary fallback columns
     let mut result = BalanceReads::default();
-    result.from_dfs(dfs, &schemas)?;
+    result.parse_dfs(dfs, &schemas)?;
 
     println!("Result n_rows: {}", result.n_rows);
     println!("Result fallback_u256: {:?}", result.fallback_u256);
