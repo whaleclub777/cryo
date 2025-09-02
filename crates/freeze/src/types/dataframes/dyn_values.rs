@@ -95,6 +95,39 @@ impl<T> OptionVec<T> {
     }
 }
 
+impl<T> TryInto<Vec<T>> for OptionVec<T>
+where
+    T: Default,
+{
+    type Error = crate::CollectError;
+
+    fn try_into(self) -> Result<Vec<T>, Self::Error> {
+        match self {
+            OptionVec::Some(v) => Ok(v),
+            OptionVec::Option(v) => v
+                .into_iter()
+                .enumerate()
+                .map(|(i, opt)| {
+                    opt.ok_or_else(|| {
+                        crate::CollectError::CollectError(format!("Missing value at index {i}"))
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>(),
+        }
+    }
+}
+
+impl<T> TryInto<Vec<Option<T>>> for OptionVec<T> {
+    type Error = crate::CollectError;
+
+    fn try_into(self) -> Result<Vec<Option<T>>, Self::Error> {
+        match self {
+            OptionVec::Some(v) => Ok(v.into_iter().map(Some).collect()),
+            OptionVec::Option(v) => Ok(v),
+        }
+    }
+}
+
 /// A collection of dynamic values that can be used in a DataFrame column.
 pub enum DynValues {
     /// int

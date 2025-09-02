@@ -10,7 +10,7 @@ pub mod sources;
 
 /// column data specification
 pub mod columns;
-pub use columns::{ColumnData, Dataset, ToDataFrames};
+pub use columns::{ColumnData, Dataset, FromDataFrames, ToDataFrames};
 
 /// partitions
 pub mod partitions;
@@ -53,7 +53,7 @@ pub use chunks::{
     AddressChunk, BlockChunk, CallDataChunk, Chunk, ChunkData, ChunkStats, RawBytes, SlotChunk,
     Subchunk, TopicChunk, TransactionChunk,
 };
-pub use conversions::{bytes_to_u32, ToVecHex, ToVecU8};
+pub use conversions::{bytes_to_u32, FromBinaryVec, ToVecHex, ToVecU8};
 pub use dataframes::*;
 pub use datatypes::*;
 pub use files::{ColumnEncoding, FileFormat, FileOutput, SubDir};
