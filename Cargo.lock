@@ -1771,6 +1771,7 @@ dependencies = [
  "color-print",
  "colored",
  "cryo_freeze",
+ "cryo_to_df",
  "eyre",
  "governor",
  "hex",

@@ -12,6 +12,9 @@ mod parse;
 mod remember;
 mod run;
 
+#[cfg(test)]
+mod test_from_dataframes;
+
 // used in main.rs but not lib.rs
 use eyre as _;
 use tokio as _;

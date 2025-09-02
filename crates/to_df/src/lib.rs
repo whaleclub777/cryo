@@ -61,6 +61,9 @@ impl ToDataFramesMetaParams {
 /// #     pub trait ToDataFrames: Sized {
 /// #         fn create_dfs(self, schemas: &HashMap<Datatype, Table>, chain_id: u64) -> Result<HashMap<Datatype, DataFrame>, CollectError>;
 /// #     }
+/// #     pub trait FromDataFrames: Sized + Default {
+/// #         fn from_dfs(dfs: HashMap<Datatype, DataFrame>, datatype: &Datatype) -> Result<Self, CollectError>;
+/// #     }
 /// # }
 /// use cryo_freeze::*;
 /// use polars::prelude::*;
@@ -214,6 +217,233 @@ pub fn to_data_frames(input: TokenStream) -> TokenStream {
                 indexmap::IndexMap::from_iter(vec![
                     #(#column_types),*
                 ])
+            }
+        }
+    };
+
+    expanded.into()
+}
+
+/// Implements FromDataFrames for struct.
+///
+/// Usage:
+/// ```no_run
+/// # use cryo_to_df::FromDataFrames;
+/// # pub mod cryo_freeze {
+/// #     pub mod polars {
+/// #         pub mod prelude {
+/// #             pub struct DataFrame; 
+/// #             impl DataFrame { 
+/// #                 pub fn column(&self, name: &str) -> Result<&Series, ()> { Ok(&Series) }
+/// #                 pub fn height(&self) -> usize { 0 }
+/// #             }
+/// #             pub struct Series;
+/// #             impl Series {
+/// #                 pub fn u32(&self) -> Result<Vec<Option<u32>>, ()> { Ok(vec![]) }
+/// #                 pub fn u64(&self) -> Result<Vec<Option<u64>>, ()> { Ok(vec![]) }
+/// #                 pub fn str(&self) -> Result<Vec<Option<&str>>, ()> { Ok(vec![]) }
+/// #             }
+/// #         }
+/// #     }
+/// #     use polars::prelude::*;
+/// #     use std::collections::HashMap;
+/// #     pub enum CollectError { PolarsError(()) }
+/// #     #[derive(Hash, PartialEq, Eq)]
+/// #     pub enum Datatype { MyStruct }
+/// #     pub trait FromDataFrames: Sized + Default {
+/// #         fn from_dfs(dfs: HashMap<Datatype, DataFrame>, datatype: &Datatype) -> Result<Self, CollectError>;
+/// #     }
+/// # }
+/// use cryo_freeze::*;
+/// use polars::prelude::*;
+///
+/// #[derive(FromDataFrames)]
+/// struct MyStruct {
+///     n_rows: u64,
+///     field1: Vec<u32>,
+///     field2: Vec<String>,
+///     chain_id: Vec<u64>,
+/// }
+/// ```
+#[proc_macro_derive(FromDataFrames, attributes(to_df))]
+pub fn from_data_frames(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as ItemStruct);
+
+    let name = &input.ident;
+
+    let field_names_and_types: Vec<_> =
+        input.fields.iter().map(|f| (f.ident.clone().unwrap(), f.ty.clone())).collect();
+
+    // Generate field population code
+    let field_population: Vec<_> = field_names_and_types
+        .iter()
+        .filter(|(name, _)| quote!(#name).to_string() != "n_rows")
+        .filter(|(_, value)| quote!(#value).to_string().starts_with("Vec"))
+        .map(|(name, ty)| {
+            let field_name_str = quote!(#name).to_string();
+            match quote!(#ty).to_string().as_str() {
+                "Vec < u32 >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .u32()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default())
+                        .collect();
+                },
+                "Vec < u64 >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .u64()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default())
+                        .collect();
+                },
+                "Vec < i32 >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .i32()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default())
+                        .collect();
+                },
+                "Vec < i64 >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .i64()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default())
+                        .collect();
+                },
+                "Vec < f32 >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .f32()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default())
+                        .collect();
+                },
+                "Vec < f64 >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .f64()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default())
+                        .collect();
+                },
+                "Vec < String >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .str()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default().to_string())
+                        .collect();
+                },
+                "Vec < bool >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .bool()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.unwrap_or_default())
+                        .collect();
+                },
+                // Handle Option types
+                "Vec < Option < u32 > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .u32()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .collect();
+                },
+                "Vec < Option < u64 > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .u64()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .collect();
+                },
+                "Vec < Option < i32 > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .i32()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .collect();
+                },
+                "Vec < Option < i64 > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .i64()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .collect();
+                },
+                "Vec < Option < f32 > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .f32()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .collect();
+                },
+                "Vec < Option < f64 > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .f64()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .collect();
+                },
+                "Vec < Option < String > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .str()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .map(|x| x.map(|s| s.to_string()))
+                        .collect();
+                },
+                "Vec < Option < bool > >" => quote! {
+                    result.#name = df.column(#field_name_str)
+                        .map_err(CollectError::PolarsError)?
+                        .bool()
+                        .map_err(CollectError::PolarsError)?
+                        .into_iter()
+                        .collect();
+                },
+                _ => quote! {
+                    // Handle unsupported types - for now, just set to default
+                    result.#name = vec![];
+                },
+            }
+        })
+        .collect();
+
+    let expanded = quote! {
+        impl FromDataFrames for #name {
+            fn from_dfs(
+                dfs: std::collections::HashMap<Datatype, DataFrame>,
+                datatype: &Datatype,
+            ) -> Result<Self, CollectError> {
+                let df = dfs.get(datatype).ok_or_else(|| {
+                    CollectError::PolarsError(polars::prelude::PolarsError::ColumnNotFound("dataframe not found".into()))
+                })?;
+                
+                let mut result = Self::default();
+                result.n_rows = df.height() as u64;
+                
+                #(#field_population)*
+                
+                Ok(result)
             }
         }
     };
