@@ -51,3 +51,60 @@ jobs:
         with:
           components: rustfmt
       - run: cargo fmt --all --check
+
+  package:
+    name: Build and upload artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # run on PRs (workflow already triggers on pull_request)
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build CLI (release)
+        run: cargo build -p cli --workspace --release
+
+      - name: Package CLI (per-OS)
+        # use bash on all runners for consistent scripting
+        shell: bash
+        run: |
+          mkdir -p dist/${{ matrix.os }}
+          echo "Packaging CLI for runner.os=${{ runner.os }}"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp -f target/release/cryo.exe dist/${{ matrix.os }}/ || true
+            # create a zip on Windows
+            powershell -NoProfile -Command "Compress-Archive -Path 'dist/${{ matrix.os }}/*' -DestinationPath 'dist/cryo-cli-${{ matrix.os }}-${{ github.sha }}.zip' -Force"
+          else
+            cp -f target/release/cryo dist/${{ matrix.os }}/ || true
+            tar -czf dist/cryo-cli-${{ matrix.os }}-${{ github.sha }}.tar.gz -C dist/${{ matrix.os }} .
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install maturin
+        run: python -m pip install --upgrade pip maturin
+
+      - name: Build Python wheel (maturin, per-OS)
+        shell: bash
+        run: |
+          mkdir -p dist/${{ matrix.os }}
+          cd crates/python
+          # build wheel into a per-OS dist directory
+          maturin build --release --strip -o ../../dist/${{ matrix.os }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: cryo-artifacts-${{ matrix.os }}-${{ github.run_id }}
+          path: dist/*
