@@ -30,3 +30,9 @@ thiserror = { workspace = true }
 thousands = { workspace = true }
 tokio = { workspace = true }
 url = "2.5.2"
+
+[features]
+default = ["reqwest-default-tls"]
+reqwest-default-tls = ["alloy/reqwest"]
+reqwest-native-tls = ["alloy/reqwest-native-tls"]
+reqwest-rustls-tls = ["alloy/reqwest-rustls-tls"]
