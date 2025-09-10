@@ -55,7 +55,7 @@ jobs:
       - run: cargo fmt --all --check
 
   package:
-    name: Build and upload artifacts
+    name: Upload artifacts
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     # run on PRs (workflow already triggers on pull_request)
@@ -115,7 +115,7 @@ jobs:
           maturin build --release --strip -o ..\..\dist\${{ matrix.os }}
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cryo-artifacts-${{ matrix.os }}-${{ github.run_id }}
           path: dist/*
