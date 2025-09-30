@@ -57,7 +57,7 @@ jobs:
   package:
     name: Upload artifacts
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     # run on PRs (workflow already triggers on pull_request)
     needs: [build]
     strategy:
@@ -114,8 +114,22 @@ jobs:
           cd crates\python
           maturin build --release --strip -o ..\..\dist\${{ matrix.os }}
 
-      - name: Upload artifacts
+      - name: Upload artifacts (unix)
+        if: matrix.os != 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
           name: cryo-artifacts-${{ matrix.os }}-${{ github.run_id }}
-          path: dist/*
+          path: |
+            dist/cryo-cli-${{ matrix.os }}-*.tar.gz
+            dist/${{ matrix.os }}/*.whl
+            dist/${{ matrix.os }}/**
+
+      - name: Upload artifacts (windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cryo-artifacts-${{ matrix.os }}-${{ github.run_id }}
+          path: |
+            dist/cryo-cli-${{ matrix.os }}-*.zip
+            dist\${{ matrix.os }}\*.whl
+            dist\${{ matrix.os }}\**
