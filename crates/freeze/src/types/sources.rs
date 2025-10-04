@@ -7,8 +7,7 @@ use alloy::{
         ext::{DebugApi, TraceApi},
         DynProvider, Provider, ProviderBuilder,
     },
-    rpc::client::ClientBuilder,
-    rpc::types::{
+    rpc::{client::{ClientBuilder, RpcClient}, types::{
         trace::{
             common::TraceResult,
             geth::{
@@ -22,9 +21,10 @@ use alloy::{
         },
         Block, BlockTransactions, BlockTransactionsKind, Filter, Log, Transaction,
         TransactionInput, TransactionReceipt, TransactionRequest,
-    },
-    transports::{http::reqwest::Url, layers::RetryBackoffLayer, RpcError, TransportErrorKind},
+    }},
+    transports::{layers::RetryBackoffLayer, utils::guess_local_url, BoxTransport, IntoBoxTransport, RpcError, TransportErrorKind},
 };
+use alloy_transport_http::{AuthLayer, Http, HyperClient};
 use governor::{
     clock::DefaultClock,
     middleware::NoOpMiddleware,
@@ -35,7 +35,7 @@ use tokio::{
     task,
 };
 
-use crate::CollectError;
+use crate::{CollectError, ParseError};
 
 /// RateLimiter based on governor crate
 pub type RateLimiter = governor::RateLimiter<NotKeyed, InMemoryState, DefaultClock, NoOpMiddleware>;
@@ -179,6 +179,28 @@ pub struct SourceBuilder {
     retry: Option<(u32, u64, u64)>,
 }
 
+macro_rules! build_layered_client {
+    ($transport:expr, $($layer:ident $(? $([[$option:tt]])?)?),*) => {
+        build_layered_client!(@parse[] $transport, $([$(@option$($option)?)? $layer],)*)
+    };
+    (@parse[$($l:expr),*] $transport:expr, [@option $layer:ident], $($t:tt)*) => {
+        if let Some($layer) = $layer {
+            build_layered_client!(@parse[$($l,)* $layer] $transport, $($t)*)
+        } else {
+            build_layered_client!(@parse[$($l),*] $transport, $($t)*)
+        }
+    };
+    (@parse[$($layer:expr),*] $transport:expr,) => {
+        build_layered_client!(@build $transport, $($layer,)*)
+    };
+    (@build $transport:expr, $($layer:expr,)*) => {{
+        let (transport, is_local) = $transport;
+        ClientBuilder::default()
+            $(.layer($layer))*
+            .transport(transport, is_local)
+    }};
+}
+
 impl SourceBuilder {
     /// Create a fresh builder with no configuration.
     pub fn new() -> Self {
@@ -254,34 +276,56 @@ impl SourceBuilder {
         self
     }
 
+    fn build_http_transport(&self) -> Result<(BoxTransport, bool)> {
+        let rpc_url = self.rpc_url.as_deref().ok_or_else(|| {
+            CollectError::CollectError(
+                "SourceBuilder requires either provider or rpc_url".to_string(),
+            )
+        })?;
+        let is_local = guess_local_url(rpc_url);
+        let rpc_url = rpc_url
+            .parse()
+            .map_err(|e| CollectError::ParseError(ParseError::ParseUrlError(e)))?;
+
+        // Attach auth layer at the transport level if JWT provided
+        let http = if let Some(jwt) = self.jwt.as_deref() {
+            match jwt.parse() {
+                Ok(secret) => {
+                    let layer = AuthLayer::new(secret);
+                    // HyperClient::with_service(service)
+                    build_http_jwt_client(layer, rpc_url)
+                },
+                Err(e) => {
+                    return Err(CollectError::ParseError(ParseError::ParseJwtError(
+                        e.to_string(),
+                    )));
+                }
+            }
+        } else {
+            Http::new(rpc_url).into_box_transport()
+        };
+
+        Ok((http, is_local))
+    }
+
+    fn build_client(&self) -> Result<RpcClient> {
+        // Optional retry layer only (auth already applied at transport level)
+        let retry_layer = self
+            .retry
+            .map(|(max_r, initial_backoff, cu_ps)| RetryBackoffLayer::new(max_r, initial_backoff, cu_ps));
+        let transport = self.build_http_transport()?;
+        let client = build_layered_client!(transport, retry_layer?);
+        Ok(client)
+    }
+
     /// Build the `Source`. This may perform network I/O to fetch `chain_id`
     /// if it was not supplied.
     pub async fn build(mut self) -> Result<Source> {
         // Ensure we have a provider
         if self.provider.is_none() {
-            let url = self.rpc_url.clone().ok_or_else(|| {
-                CollectError::CollectError(
-                    "SourceBuilder requires either provider or rpc_url".to_string(),
-                )
-            })?;
-            // If retry params are specified, build via ClientBuilder + RetryBackoffLayer;
-            // otherwise use plain http provider.
-            if let Some((max_r, initial_backoff, cu_ps)) = self.retry {
-                let layer = RetryBackoffLayer::new(max_r, initial_backoff, cu_ps);
-                let client = ClientBuilder::default()
-                    .layer(layer)
-                    .connect(&url)
-                    .await
-                    .map_err(|e| CollectError::RPCError(format!("failed to connect client: {e}")))?;
-                let provider = ProviderBuilder::default().connect_client(client).erased();
-                self.provider = Some(provider);
-            } else {
-                let parsed: Url = url.parse().map_err(|_| {
-                    CollectError::CollectError("rpc url is not valid".to_string())
-                })?;
-                let provider = ProviderBuilder::new().connect_http(parsed);
-                self.provider = Some(provider.erased());
-            }
+            let client = self.build_client()?;
+            let provider = ProviderBuilder::new().connect_client(client);
+            self.provider = Some(provider.erased());
         }
         let provider = self.provider.expect("provider just ensured above");
 
@@ -321,6 +365,27 @@ impl SourceBuilder {
             labels,
         })
     }
+}
+
+/// Build a hyper-based transport that applies the provided `AuthLayer`.
+/// We take ownership of the parsed URL so we can construct an `Http` transport
+/// with the layered hyper client and return it as a `BoxTransport`.
+pub fn build_http_jwt_client(layer: AuthLayer, url: url::Url) -> BoxTransport {
+    use http_body_util::Full;
+    use alloy_transport_http::hyper::body::Bytes;
+    use alloy_transport_http::hyper_util::{client::legacy::Client, rt::TokioExecutor};
+
+    // Build a legacy hyper client (the underlying service)
+    let hyper_service = Client::builder(TokioExecutor::new())
+        .build_http::<Full<Bytes>>();
+
+    // Wrap the hyper service with the auth layer
+    let service = tower::ServiceBuilder::new().layer(layer).service(hyper_service);
+
+    // Create an alloy HyperClient from the layered service and wrap it in an
+    // Http transport, then convert to a BoxTransport.
+    let hyper_client = HyperClient::with_service(service);
+    Http::with_client(hyper_client, url).into_box_transport()
 }
 
 impl Source {
