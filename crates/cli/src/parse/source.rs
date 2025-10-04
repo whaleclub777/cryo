@@ -1,12 +1,7 @@
-use std::{env, sync::Arc};
+use std::env;
 
 use crate::args::Args;
-use alloy::{
-    providers::{Provider, ProviderBuilder},
-    rpc::client::ClientBuilder,
-    transports::layers::RetryBackoffLayer,
-};
-use cryo_freeze::{ParseError, Source, SourceLabels, normalize_rpc_url};
+use cryo_freeze::{ParseError, Source, SourceLabels};
 use governor::{Quota, RateLimiter};
 use std::num::NonZeroU32;
 
@@ -18,17 +13,8 @@ pub(crate) async fn parse_source(args: &Args) -> Result<Source, ParseError> {
         Some(v) => Some(v.clone()),
         None => std::env::var("ETH_RPC_JWT").ok(),
     };
-    let retry_layer = RetryBackoffLayer::new(
-        args.max_retries,
-        args.initial_backoff,
-        args.compute_units_per_second,
-    );
     // Placeholder for future JWT integration once alloy exposes header injection.
-    // For now we simply note presence of JWT without attaching it.
-    if jwt.is_some() { tracing::debug!("JWT token provided; header injection not yet supported"); }
-    let client_builder = ClientBuilder::default().layer(retry_layer);
-    let client = client_builder.connect(&rpc_url).await.map_err(ParseError::ProviderError)?;
-    let provider = ProviderBuilder::default().connect_client(client).erased();
+    // if jwt.is_some() { tracing::debug!("JWT token provided; header injection not yet supported"); }
     let rate_limiter = match args.requests_per_second {
         Some(rate_limit) => match (NonZeroU32::new(1), NonZeroU32::new(rate_limit)) {
             (Some(one), Some(value)) => {
@@ -58,8 +44,6 @@ pub(crate) async fn parse_source(args: &Args) -> Result<Source, ParseError> {
     };
 
     let source = Source::builder()
-        .provider(provider)
-        .chain_id(chain_id)
         .rpc_url(rpc_url.clone())
         .inner_request_size(args.inner_request_size)
         .max_concurrent_chunks(max_concurrent_chunks)
@@ -67,6 +51,11 @@ pub(crate) async fn parse_source(args: &Args) -> Result<Source, ParseError> {
         .rate_limiter(rate_limiter)
         .jwt(jwt)
         .labels(labels)
+        .retry_policy(
+            args.max_retries,
+            args.initial_backoff,
+            args.compute_units_per_second,
+        )
         .build()
         .await
         .map_err(|e| ParseError::ParseError(format!("failed to build Source: {e}")))?;
@@ -105,5 +94,5 @@ pub(crate) fn parse_rpc_url(args: &Args) -> Result<String, ParseError> {
     };
 
     // prepend http or https if need be
-    Ok(normalize_rpc_url(url))
+    Ok(url)
 }
