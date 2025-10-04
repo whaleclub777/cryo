@@ -120,36 +120,7 @@ impl Source {
     /// initialize source
     pub async fn init(rpc_url: Option<String>) -> Result<Source> {
         let rpc_url: String = parse_rpc_url(rpc_url);
-        let parsed_rpc_url: Url = rpc_url.parse().expect("rpc url is not valid");
-        let provider = ProviderBuilder::new().connect_http(parsed_rpc_url.clone());
-        let chain_id = provider
-            .get_chain_id()
-            .await
-            .map_err(|_| CollectError::RPCError("could not get chain_id".to_string()))?;
-
-        let rate_limiter = None;
-        let semaphore = None;
-
-        let provider = ProviderBuilder::new().connect_http(parsed_rpc_url);
-
-        let source = Source {
-            provider: provider.erased(),
-            chain_id,
-            inner_request_size: DEFAULT_INNER_REQUEST_SIZE,
-            max_concurrent_chunks: Some(DEFAULT_MAX_CONCURRENT_CHUNKS),
-            rpc_url,
-            jwt: None,
-            labels: SourceLabels {
-                max_concurrent_requests: Some(DEFAULT_MAX_CONCURRENT_REQUESTS),
-                max_requests_per_second: Some(0),
-                max_retries: Some(DEFAULT_MAX_RETRIES),
-                initial_backoff: Some(DEFAULT_INTIAL_BACKOFF),
-            },
-            rate_limiter: rate_limiter.into(),
-            semaphore: semaphore.into(),
-        };
-
-        Ok(source)
+        SourceBuilder::new().rpc_url(rpc_url).build().await
     }
 
     // /// set rate limit
@@ -191,14 +162,135 @@ fn parse_rpc_url(rpc_url: Option<String>) -> String {
 //     /// Labels (these are non-functional)
 //     pub labels: Option<SourceLabels>,
 // }
+/// Builder for `Source`. Keeps the `freeze` crate lightweight while allowing
+/// richer construction logic (CLI, Python bindings, tests) to compose a
+/// provider with concurrency & rate limiting concerns.
+#[derive(Default, Debug)]
+pub struct SourceBuilder {
+    rpc_url: Option<String>,
+    provider: Option<DynProvider>,
+    chain_id: Option<u64>,
+    inner_request_size: Option<u64>,
+    max_concurrent_chunks: Option<u64>, // explicit None => unlimited
+    semaphore: Option<Arc<Option<Semaphore>>>,
+    rate_limiter: Option<Arc<Option<RateLimiter>>>,
+    jwt: Option<String>,
+    labels: Option<SourceLabels>,
+}
 
-// impl SourceBuilder {
-//     fn new(mut self) -> SourceBuilder {
-//     }
+impl SourceBuilder {
+    pub fn new() -> Self { Self::default() }
 
-//     fn build(self) -> Source {
-//     }
-// }
+    /// Provide an already constructed provider (overrides rpc_url if both set).
+    pub fn provider(mut self, provider: DynProvider) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    /// Set the RPC url (used only if `provider` not supplied).
+    pub fn rpc_url(mut self, url: String) -> Self {
+        self.rpc_url = Some(url);
+        self
+    }
+
+    pub fn chain_id(mut self, chain_id: u64) -> Self {
+        self.chain_id = Some(chain_id);
+        self
+    }
+
+    pub fn inner_request_size(mut self, size: u64) -> Self {
+        self.inner_request_size = Some(size);
+        self
+    }
+
+    pub fn max_concurrent_chunks(mut self, m: Option<u64>) -> Self {
+        self.max_concurrent_chunks = m;
+        self
+    }
+
+    pub fn semaphore(mut self, semaphore: Option<Semaphore>) -> Self {
+        self.semaphore = Some(Arc::new(semaphore));
+        self
+    }
+
+    pub fn rate_limiter(mut self, limiter: Option<RateLimiter>) -> Self {
+        self.rate_limiter = Some(Arc::new(limiter));
+        self
+    }
+
+    pub fn jwt(mut self, jwt: Option<String>) -> Self {
+        self.jwt = jwt;
+        self
+    }
+
+    pub fn labels(mut self, labels: SourceLabels) -> Self {
+        self.labels = Some(labels);
+        self
+    }
+
+    /// Build the `Source`. This may perform network I/O to fetch `chain_id`
+    /// if it was not supplied.
+    pub async fn build(mut self) -> Result<Source> {
+        // Ensure we have a provider
+        if self.provider.is_none() {
+            let url = self.rpc_url.clone().ok_or_else(|| {
+                CollectError::CollectError(
+                    "SourceBuilder requires either provider or rpc_url".to_string(),
+                )
+            })?;
+            let parsed: Url = url.parse().map_err(|_| {
+                CollectError::CollectError("rpc url is not valid".to_string())
+            })?;
+            let provider = ProviderBuilder::new().connect_http(parsed);
+            self.provider = Some(provider.erased());
+        }
+        let provider = self.provider.expect("provider just ensured above");
+
+        // Resolve chain id if needed
+        if self.chain_id.is_none() {
+            let id = provider.get_chain_id().await.map_err(|_| {
+                CollectError::RPCError("could not get chain_id".to_string())
+            })?;
+            self.chain_id = Some(id);
+        }
+
+        // Defaults
+        let inner_request_size = self.inner_request_size.unwrap_or(DEFAULT_INNER_REQUEST_SIZE);
+        let max_concurrent_chunks = self.max_concurrent_chunks.unwrap_or(Some(
+            DEFAULT_MAX_CONCURRENT_CHUNKS,
+        ));
+        let labels = self.labels.unwrap_or(SourceLabels {
+            max_concurrent_requests: Some(DEFAULT_MAX_CONCURRENT_REQUESTS),
+            max_requests_per_second: Some(0),
+            max_retries: Some(DEFAULT_MAX_RETRIES),
+            initial_backoff: Some(DEFAULT_INTIAL_BACKOFF),
+        });
+
+        let semaphore = self
+            .semaphore
+            .unwrap_or_else(|| Arc::new(None));
+        let rate_limiter = self
+            .rate_limiter
+            .unwrap_or_else(|| Arc::new(None));
+
+        Ok(Source {
+            provider,
+            chain_id: self.chain_id.expect("chain id ensured"),
+            inner_request_size,
+            max_concurrent_chunks,
+            rpc_url: self.rpc_url.unwrap_or_else(|| "unknown".to_string()),
+            jwt: self.jwt,
+            semaphore,
+            rate_limiter,
+            labels,
+        })
+    }
+}
+
+impl Source {
+    /// Start building a `Source` with `SourceBuilder`.
+    pub fn builder() -> SourceBuilder { SourceBuilder::new() }
+}
 
 /// source labels (non-functional)
 #[derive(Clone, Debug, Default)]
