@@ -16,16 +16,12 @@ exclude = [".github/"]
 
 [workspace.dependencies]
 cryo_cli = { version = "0.3.2", path = "./crates/cli" }
-cryo_freeze = { version = "0.3.2", path = "./crates/freeze" }
+cryo_freeze = { version = "0.3.2", path = "./crates/freeze", default-features = false }
 cryo_to_df = { version = "0.3.2", path = "./crates/to_df" }
 
-alloy = { version = "1.0.9", features = [
+alloy = { version = "1.0.9", default-features = false, features = [
+    "std",
     "full",
-    "rpc-types-trace",
-    "provider-ws",
-    "provider-ipc",
-    "provider-debug-api",
-    "provider-trace-api",
     "transport-ipc-mock",
 ] }
 anstyle = "1.0.4"

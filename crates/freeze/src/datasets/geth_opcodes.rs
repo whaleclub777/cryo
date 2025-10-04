@@ -137,7 +137,7 @@ fn process_trace(
         store!(schema, columns, gas, struct_log.gas);
         store!(schema, columns, gas_cost, struct_log.gas_cost);
         store!(schema, columns, pc, struct_log.pc);
-        store!(schema, columns, op, struct_log.op);
+        store!(schema, columns, op, struct_log.op.to_string());
         store!(schema, columns, refund_counter, struct_log.refund_counter);
 
         if schema.has_column("memory") {
