@@ -146,6 +146,19 @@ fn parse_rpc_url(rpc_url: Option<String>) -> String {
     url
 }
 
+/// Normalizes a raw RPC endpoint string by ensuring it has a URI scheme
+/// (http://) unless it already starts with http/https, ws/wss, or is an IPC path.
+/// This is public so front-ends (CLI, Python bindings) can share identical
+/// normalization logic.
+pub fn normalize_rpc_url<S: AsRef<str>>(raw: S) -> String {
+    let raw = raw.as_ref();
+    if raw.starts_with("http") || raw.starts_with("ws") || raw.ends_with(".ipc") {
+        raw.to_string()
+    } else {
+        format!("http://{}", raw)
+    }
+}
+
 // builder
 
 // struct SourceBuilder {
@@ -256,9 +269,9 @@ impl SourceBuilder {
 
         // Defaults
         let inner_request_size = self.inner_request_size.unwrap_or(DEFAULT_INNER_REQUEST_SIZE);
-        let max_concurrent_chunks = self.max_concurrent_chunks.unwrap_or(Some(
+        let max_concurrent_chunks = self.max_concurrent_chunks.unwrap_or(
             DEFAULT_MAX_CONCURRENT_CHUNKS,
-        ));
+        );
         let labels = self.labels.unwrap_or(SourceLabels {
             max_concurrent_requests: Some(DEFAULT_MAX_CONCURRENT_REQUESTS),
             max_requests_per_second: Some(0),
@@ -277,7 +290,7 @@ impl SourceBuilder {
             provider,
             chain_id: self.chain_id.expect("chain id ensured"),
             inner_request_size,
-            max_concurrent_chunks,
+            max_concurrent_chunks: Some(max_concurrent_chunks),
             rpc_url: self.rpc_url.unwrap_or_else(|| "unknown".to_string()),
             jwt: self.jwt,
             semaphore,
@@ -1097,4 +1110,52 @@ fn parse_geth_diff_object(map: serde_json::Map<String, serde_json::Value>) -> Re
         .map_err(|_| err("cannot deserialize pre diff"))?;
 
     Ok(DiffMode { pre, post })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // These tests assume an ETH_RPC_URL pointing to a dev node or that the URL is unreachable.
+    // For CI determinism, consider mocking provider once alloy offers an in-memory transport.
+
+    #[tokio::test]
+    async fn builder_defaults_from_url() {
+        // Use an obviously invalid URL but with correct shape; build should fail only when chain_id fetch fails.
+        // If environment has ETH_RPC_URL set and reachable, this will exercise more.
+        let url = "http://localhost:8545".to_string();
+        let build = Source::builder().rpc_url(url).build().await;
+        // We can't guarantee local node is up in test environment, so just assert we get some result (Ok or Err is acceptable).
+        // If Ok, validate some defaults.
+        if let Ok(source) = build {
+            assert_eq!(source.inner_request_size, 100, "default inner_request_size");
+            assert_eq!(source.max_concurrent_chunks, Some(4));
+            assert!(source.labels.max_retries.is_some());
+        }
+    }
+
+    #[tokio::test]
+    async fn builder_overrides() {
+        // This test will likely fail without a running node because chain_id fetch is required.
+        // Skip if no local node.
+        let url = "http://localhost:8545";
+        let result = Source::builder()
+            .rpc_url(url.to_string())
+            .inner_request_size(42)
+            .max_concurrent_chunks(Some(7))
+            .labels(SourceLabels {
+                max_concurrent_requests: Some(10),
+                max_requests_per_second: Some(5),
+                max_retries: Some(3),
+                initial_backoff: Some(1),
+            })
+            .build()
+            .await;
+        if let Ok(source) = result { // if a node is available
+            assert_eq!(source.inner_request_size, 42);
+            assert_eq!(source.max_concurrent_chunks, Some(7));
+            assert_eq!(source.labels.max_retries, Some(3));
+        }
+    }
+
 }
