@@ -83,27 +83,27 @@ jobs:
             arch: aarch64
             target: aarch64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
       - name: Install rust target
-        run: rustup target add {{ matrix.target }}
+        run: rustup target add ${{ matrix.target }}
 
       - name: Build CLI (release)
         run: |
-          cargo build -p cryo_cli --release --target {{ matrix.target }}
+          cargo build -p cryo_cli --release --target ${{ matrix.target }}
 
       - name: Package CLI (unix)
         if: matrix.os != 'windows-latest'
         run: |
           mkdir -p dist/${{ matrix.os }}-${{ matrix.arch }}
-          echo "Packaging CLI for runner.os=${{ runner.os }} runner.arch=${{ runner.arch }}"
+          echo "Packaging CLI for runner.os=${{ runner.os }} matrix.arch=${{ matrix.arch }}"
           # Prefer the target-specific release path if it exists (cross/target builds)
-          if [ -f "target/{{ matrix.target }}/release/cryo" ]; then
-            cp -f "target/{{ matrix.target }}/release/cryo" dist/${{ matrix.os }}-${{ matrix.arch }}/ || true
+          if [ -f "target/${{ matrix.target }}/release/cryo" ]; then
+            cp -f "target/${{ matrix.target }}/release/cryo" dist/${{ matrix.os }}-${{ matrix.arch }}/ || true
           else
             cp -f target/release/cryo dist/${{ matrix.os }}-${{ matrix.arch }}/ || true
           fi
@@ -114,9 +114,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "dist\${{ matrix.os }}-${{ matrix.arch }}" | Out-Null
-          Write-Host "Packaging CLI on Windows runner"
-          if (Test-Path -Path "target\{{ matrix.target }}\release\cryo.exe") {
-            Copy-Item -Path "target\{{ matrix.target }}\release\cryo.exe" -Destination "dist\${{ matrix.os }}-${{ matrix.arch }}\" -Force
+          Write-Host "Packaging CLI on Windows runner for matrix.arch=${{ matrix.arch }}"
+          if (Test-Path -Path "target\${{ matrix.target }}\release\cryo.exe") {
+            Copy-Item -Path "target\${{ matrix.target }}\release\cryo.exe" -Destination "dist\${{ matrix.os }}-${{ matrix.arch }}\" -Force
           } elseif (Test-Path -Path "target\release\cryo.exe") {
             Copy-Item -Path "target\release\cryo.exe" -Destination "dist\${{ matrix.os }}-${{ matrix.arch }}\" -Force
           }
@@ -133,7 +133,7 @@ jobs:
       - name: Build Python wheel
         run: |
           cd crates/python
-          maturin build --release --strip -o ../../dist/
+          maturin build --release --strip --target ${{ matrix.target }} -o ../../dist/
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
