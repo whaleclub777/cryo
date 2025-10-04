@@ -7,22 +7,29 @@ use alloy::{
         ext::{DebugApi, TraceApi},
         DynProvider, Provider, ProviderBuilder,
     },
-    rpc::{client::{ClientBuilder, RpcClient}, types::{
-        trace::{
-            common::TraceResult,
-            geth::{
-                AccountState, CallConfig, CallFrame, DefaultFrame, DiffMode,
-                GethDebugBuiltInTracerType, GethDebugTracerType, GethDebugTracingOptions,
-                GethTrace, PreStateConfig, PreStateFrame,
+    rpc::{
+        client::{ClientBuilder, RpcClient},
+        types::{
+            trace::{
+                common::TraceResult,
+                geth::{
+                    AccountState, CallConfig, CallFrame, DefaultFrame, DiffMode,
+                    GethDebugBuiltInTracerType, GethDebugTracerType, GethDebugTracingOptions,
+                    GethTrace, PreStateConfig, PreStateFrame,
+                },
+                parity::{
+                    LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash,
+                    TraceType,
+                },
             },
-            parity::{
-                LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType,
-            },
+            Block, BlockTransactions, BlockTransactionsKind, Filter, Log, Transaction,
+            TransactionInput, TransactionReceipt, TransactionRequest,
         },
-        Block, BlockTransactions, BlockTransactionsKind, Filter, Log, Transaction,
-        TransactionInput, TransactionReceipt, TransactionRequest,
-    }},
-    transports::{layers::RetryBackoffLayer, utils::guess_local_url, BoxTransport, IntoBoxTransport, RpcError, TransportErrorKind},
+    },
+    transports::{
+        layers::RetryBackoffLayer, utils::guess_local_url, BoxTransport, IntoBoxTransport,
+        RpcError, TransportErrorKind,
+    },
 };
 use alloy_transport_http::{AuthLayer, Http, HyperClient};
 use governor::{
@@ -204,10 +211,7 @@ macro_rules! build_layered_client {
 impl SourceBuilder {
     /// Create a fresh builder with no configuration.
     pub fn new() -> Self {
-        Self {
-            max_concurrent_chunks: Some(DEFAULT_MAX_CONCURRENT_CHUNKS),
-            ..Self::default()
-        }
+        Self { max_concurrent_chunks: Some(DEFAULT_MAX_CONCURRENT_CHUNKS), ..Self::default() }
     }
 
     /// Provide an already constructed provider (overrides rpc_url if both set).
@@ -252,7 +256,8 @@ impl SourceBuilder {
         self
     }
 
-    /// Attach an optional JWT token (currently stored for future use when auth headers become available).
+    /// Attach an optional JWT token (currently stored for future use when auth headers become
+    /// available).
     pub fn jwt(mut self, jwt: Option<String>) -> Self {
         self.jwt = jwt;
         self
@@ -265,7 +270,8 @@ impl SourceBuilder {
     }
 
     /// Configure a retry policy layer to be attached to the underlying transport.
-    /// Parameters mirror `RetryBackoffLayer::new(max_retries, initial_backoff, compute_units_per_second)`.
+    /// Parameters mirror `RetryBackoffLayer::new(max_retries, initial_backoff,
+    /// compute_units_per_second)`.
     pub fn retry_policy(
         mut self,
         max_retries: u32,
@@ -283,9 +289,8 @@ impl SourceBuilder {
             )
         })?;
         let is_local = guess_local_url(rpc_url);
-        let rpc_url = rpc_url
-            .parse()
-            .map_err(|e| CollectError::ParseError(ParseError::ParseUrlError(e)))?;
+        let rpc_url =
+            rpc_url.parse().map_err(|e| CollectError::ParseError(ParseError::ParseUrlError(e)))?;
 
         // Attach auth layer at the transport level if JWT provided
         let http = if let Some(jwt) = self.jwt.as_deref() {
@@ -294,11 +299,9 @@ impl SourceBuilder {
                     let layer = AuthLayer::new(secret);
                     // HyperClient::with_service(service)
                     build_http_jwt_client(layer, rpc_url)
-                },
+                }
                 Err(e) => {
-                    return Err(CollectError::ParseError(ParseError::ParseJwtError(
-                        e.to_string(),
-                    )));
+                    return Err(CollectError::ParseError(ParseError::ParseJwtError(e.to_string())));
                 }
             }
         } else {
@@ -310,9 +313,9 @@ impl SourceBuilder {
 
     fn build_client(&self) -> Result<RpcClient> {
         // Optional retry layer only (auth already applied at transport level)
-        let retry_layer = self
-            .retry
-            .map(|(max_r, initial_backoff, cu_ps)| RetryBackoffLayer::new(max_r, initial_backoff, cu_ps));
+        let retry_layer = self.retry.map(|(max_r, initial_backoff, cu_ps)| {
+            RetryBackoffLayer::new(max_r, initial_backoff, cu_ps)
+        });
         let transport = self.build_http_transport()?;
         let client = build_layered_client!(transport, retry_layer?);
         Ok(client)
@@ -331,9 +334,10 @@ impl SourceBuilder {
 
         // Resolve chain id if needed
         if self.chain_id.is_none() {
-            let id = provider.get_chain_id().await.map_err(|_| {
-                CollectError::RPCError("could not get chain_id".to_string())
-            })?;
+            let id = provider
+                .get_chain_id()
+                .await
+                .map_err(|_| CollectError::RPCError("could not get chain_id".to_string()))?;
             self.chain_id = Some(id);
         }
 
@@ -346,12 +350,8 @@ impl SourceBuilder {
             initial_backoff: Some(DEFAULT_INTIAL_BACKOFF),
         });
 
-        let semaphore = self
-            .semaphore
-            .unwrap_or_else(|| Arc::new(None));
-        let rate_limiter = self
-            .rate_limiter
-            .unwrap_or_else(|| Arc::new(None));
+        let semaphore = self.semaphore.unwrap_or_else(|| Arc::new(None));
+        let rate_limiter = self.rate_limiter.unwrap_or_else(|| Arc::new(None));
 
         Ok(Source {
             provider,
@@ -371,13 +371,14 @@ impl SourceBuilder {
 /// We take ownership of the parsed URL so we can construct an `Http` transport
 /// with the layered hyper client and return it as a `BoxTransport`.
 pub fn build_http_jwt_client(layer: AuthLayer, url: url::Url) -> BoxTransport {
+    use alloy_transport_http::{
+        hyper::body::Bytes,
+        hyper_util::{client::legacy::Client, rt::TokioExecutor},
+    };
     use http_body_util::Full;
-    use alloy_transport_http::hyper::body::Bytes;
-    use alloy_transport_http::hyper_util::{client::legacy::Client, rt::TokioExecutor};
 
     // Build a legacy hyper client (the underlying service)
-    let hyper_service = Client::builder(TokioExecutor::new())
-        .build_http::<Full<Bytes>>();
+    let hyper_service = Client::builder(TokioExecutor::new()).build_http::<Full<Bytes>>();
 
     // Wrap the hyper service with the auth layer
     let service = tower::ServiceBuilder::new().layer(layer).service(hyper_service);
@@ -390,7 +391,9 @@ pub fn build_http_jwt_client(layer: AuthLayer, url: url::Url) -> BoxTransport {
 
 impl Source {
     /// Start building a `Source` with `SourceBuilder`.
-    pub fn builder() -> SourceBuilder { SourceBuilder::new() }
+    pub fn builder() -> SourceBuilder {
+        SourceBuilder::new()
+    }
 }
 
 /// source labels (non-functional)
@@ -1209,12 +1212,13 @@ mod tests {
 
     #[tokio::test]
     async fn builder_defaults_from_url() {
-        // Use an obviously invalid URL but with correct shape; build should fail only when chain_id fetch fails.
-        // If environment has ETH_RPC_URL set and reachable, this will exercise more.
+        // Use an obviously invalid URL but with correct shape; build should fail only when chain_id
+        // fetch fails. If environment has ETH_RPC_URL set and reachable, this will exercise
+        // more.
         let url = "http://localhost:8545".to_string();
         let build = Source::builder().rpc_url(url).build().await;
-        // We can't guarantee local node is up in test environment, so just assert we get some result (Ok or Err is acceptable).
-        // If Ok, validate some defaults.
+        // We can't guarantee local node is up in test environment, so just assert we get some
+        // result (Ok or Err is acceptable). If Ok, validate some defaults.
         if let Ok(source) = build {
             assert_eq!(source.inner_request_size, 100, "default inner_request_size");
             assert_eq!(source.max_concurrent_chunks, Some(4));
@@ -1239,7 +1243,8 @@ mod tests {
             })
             .build()
             .await;
-        if let Ok(source) = result { // if a node is available
+        if let Ok(source) = result {
+            // if a node is available
             assert_eq!(source.inner_request_size, 42);
             assert_eq!(source.max_concurrent_chunks, Some(7));
             assert_eq!(source.labels.max_retries, Some(3));
@@ -1249,15 +1254,10 @@ mod tests {
     #[tokio::test]
     async fn builder_with_retry_policy() {
         let url = "http://localhost:8545";
-        let result = Source::builder()
-            .rpc_url(url.to_string())
-            .retry_policy(2, 1, 0)
-            .build()
-            .await;
+        let result = Source::builder().rpc_url(url.to_string()).retry_policy(2, 1, 0).build().await;
         // Success depends on local node; if Ok, we at least exercised retry path.
         if let Ok(source) = result {
             assert_eq!(source.rpc_url, url);
         }
     }
-
 }

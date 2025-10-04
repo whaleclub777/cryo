@@ -13,8 +13,6 @@ pub(crate) async fn parse_source(args: &Args) -> Result<Source, ParseError> {
         Some(v) => Some(v.clone()),
         None => std::env::var("ETH_RPC_JWT").ok(),
     };
-    // Placeholder for future JWT integration once alloy exposes header injection.
-    // if jwt.is_some() { tracing::debug!("JWT token provided; header injection not yet supported"); }
     let rate_limiter = match args.requests_per_second {
         Some(rate_limit) => match (NonZeroU32::new(1), NonZeroU32::new(rate_limit)) {
             (Some(one), Some(value)) => {
@@ -51,11 +49,7 @@ pub(crate) async fn parse_source(args: &Args) -> Result<Source, ParseError> {
         .rate_limiter(rate_limiter)
         .jwt(jwt)
         .labels(labels)
-        .retry_policy(
-            args.max_retries,
-            args.initial_backoff,
-            args.compute_units_per_second,
-        )
+        .retry_policy(args.max_retries, args.initial_backoff, args.compute_units_per_second)
         .build()
         .await
         .map_err(|e| ParseError::ParseError(format!("failed to build Source: {e}")))?;
