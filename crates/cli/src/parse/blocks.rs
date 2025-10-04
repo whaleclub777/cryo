@@ -421,6 +421,7 @@ mod tests {
             inner_request_size: 1,
             max_concurrent_chunks: None,
             rpc_url: "".to_string(),
+            jwt: None,
             labels: cryo_freeze::SourceLabels::default(),
         };
         let source = Arc::new(source);
@@ -487,6 +488,7 @@ mod tests {
             semaphore: Arc::new(None),
             max_concurrent_chunks: Some(1),
             rate_limiter: Arc::new(None),
+            jwt: None,
             labels: cryo_freeze::SourceLabels::default(),
         });
         for (test, res) in tests {
@@ -567,6 +569,7 @@ mod tests {
             inner_request_size: 1,
             max_concurrent_chunks: Some(1),
             rpc_url: "".to_string(),
+            jwt: None,
             labels: cryo_freeze::SourceLabels::default(),
         };
         let source = Arc::new(source);

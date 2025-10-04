@@ -13,16 +13,21 @@ use std::num::NonZeroU32;
 pub(crate) async fn parse_source(args: &Args) -> Result<Source, ParseError> {
     // parse network info
     let rpc_url = parse_rpc_url(args)?;
+    // capture jwt token from args or environment
+    let jwt = match &args.jwt {
+        Some(v) => Some(v.clone()),
+        None => std::env::var("ETH_RPC_JWT").ok(),
+    };
     let retry_layer = RetryBackoffLayer::new(
         args.max_retries,
         args.initial_backoff,
         args.compute_units_per_second,
     );
-    let client = ClientBuilder::default()
-        .layer(retry_layer)
-        .connect(&rpc_url)
-        .await
-        .map_err(ParseError::ProviderError)?;
+    // build client, optionally attaching JWT auth header if provided
+    let client_builder = ClientBuilder::default().layer(retry_layer);
+    println!("TODO: {jwt:?}");
+    // TODO: attach Authorization header (Bearer <jwt>) when alloy exposes stable API for header injection.
+    let client = client_builder.connect(&rpc_url).await.map_err(ParseError::ProviderError)?;
     let provider = ProviderBuilder::default().connect_client(client).erased();
     let chain_id = provider.get_chain_id().await.map_err(ParseError::ProviderError)?;
     let rate_limiter = match args.requests_per_second {
@@ -54,6 +59,7 @@ pub(crate) async fn parse_source(args: &Args) -> Result<Source, ParseError> {
         semaphore,
         rate_limiter: rate_limiter.into(),
         rpc_url,
+        jwt,
         provider,
         labels: SourceLabels {
             max_concurrent_requests: args.max_concurrent_requests,

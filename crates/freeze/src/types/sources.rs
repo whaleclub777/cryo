@@ -52,6 +52,8 @@ pub struct Source {
     pub max_concurrent_chunks: Option<u64>,
     /// Rpc Url
     pub rpc_url: String,
+    /// Optional JWT auth token for the RPC
+    pub jwt: Option<String>,
     /// semaphore for controlling concurrency
     pub semaphore: Arc<Option<Semaphore>>,
     /// rate limiter for controlling request rate
@@ -136,6 +138,7 @@ impl Source {
             inner_request_size: DEFAULT_INNER_REQUEST_SIZE,
             max_concurrent_chunks: Some(DEFAULT_MAX_CONCURRENT_CHUNKS),
             rpc_url,
+            jwt: None,
             labels: SourceLabels {
                 max_concurrent_requests: Some(DEFAULT_MAX_CONCURRENT_REQUESTS),
                 max_requests_per_second: Some(0),

@@ -365,6 +365,7 @@ mod tests {
             inner_request_size: 1,
             max_concurrent_chunks: None,
             rpc_url: "".to_string(),
+            jwt: None,
             labels: SourceLabels::default(),
         }
     }
