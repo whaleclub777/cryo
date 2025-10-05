@@ -31,7 +31,7 @@ impl LogDecoder {
             Ok(event) => Ok(Self { event, raw: event_signature.clone() }),
             Err(e) => {
                 let err = format!("incorrectly formatted event {event_signature} (expect something like event Transfer(address indexed from, address indexed to, uint256 amount) err: {e}");
-                eprintln!("{err}");
+                error!("{err}");
                 Err(err)
             }
         }
@@ -119,7 +119,7 @@ impl LogDecoder {
                         map.entry(body_keys[idx].clone()).or_default().push(param);
                     }
                 }
-                Err(e) => eprintln!("error parsing log: {e:?}"),
+                Err(e) => error!("error parsing log: {e:?}"),
             }
         }
         map

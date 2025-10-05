@@ -67,7 +67,7 @@ pub(crate) fn parse_rpc_url(args: &Args) -> Result<String, ParseError> {
         match endpoint {
             Ok(endpoint) => endpoint.map(|endpoint| endpoint.url),
             Err(e) => {
-                eprintln!("Could not load MESC data: {e}");
+                error!("Could not load MESC data: {e}");
                 None
             }
         }

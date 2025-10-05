@@ -126,32 +126,9 @@ const DEFAULT_MAX_CONCURRENT_REQUESTS: u64 = 100;
 /// builder
 impl Source {
     /// initialize source
-    pub async fn init(rpc_url: Option<String>) -> Result<Source> {
-        let rpc_url: String = parse_rpc_url(rpc_url);
+    pub async fn new(rpc_url: String) -> Result<Source> {
         SourceBuilder::new().rpc_url(rpc_url).build().await
     }
-
-    // /// set rate limit
-    // pub fn rate_limit(mut self, _requests_per_second: u64) -> Source {
-    //     todo!();
-    // }
-}
-
-fn parse_rpc_url(rpc_url: Option<String>) -> String {
-    let mut url = match rpc_url {
-        Some(url) => url.clone(),
-        _ => match std::env::var("ETH_RPC_URL") {
-            Ok(url) => url,
-            Err(_e) => {
-                println!("must provide --rpc or set ETH_RPC_URL");
-                std::process::exit(0);
-            }
-        },
-    };
-    if !url.starts_with("http") {
-        url = "http://".to_string() + url.as_str();
-    };
-    url
 }
 
 /// Normalizes a raw RPC endpoint string by ensuring it has a URI scheme
