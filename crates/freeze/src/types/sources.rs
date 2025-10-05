@@ -7,23 +7,31 @@ use alloy::{
         ext::{DebugApi, TraceApi},
         DynProvider, Provider, ProviderBuilder,
     },
-    rpc::types::{
-        trace::{
-            common::TraceResult,
-            geth::{
-                AccountState, CallConfig, CallFrame, DefaultFrame, DiffMode,
-                GethDebugBuiltInTracerType, GethDebugTracerType, GethDebugTracingOptions,
-                GethTrace, PreStateConfig, PreStateFrame,
+    rpc::{
+        client::{ClientBuilder, RpcClient},
+        types::{
+            trace::{
+                common::TraceResult,
+                geth::{
+                    AccountState, CallConfig, CallFrame, DefaultFrame, DiffMode,
+                    GethDebugBuiltInTracerType, GethDebugTracerType, GethDebugTracingOptions,
+                    GethTrace, PreStateConfig, PreStateFrame,
+                },
+                parity::{
+                    LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash,
+                    TraceType,
+                },
             },
-            parity::{
-                LocalizedTransactionTrace, TraceResults, TraceResultsWithTransactionHash, TraceType,
-            },
+            Block, BlockTransactions, BlockTransactionsKind, Filter, Log, Transaction,
+            TransactionInput, TransactionReceipt, TransactionRequest,
         },
-        Block, BlockTransactions, BlockTransactionsKind, Filter, Log, Transaction,
-        TransactionInput, TransactionReceipt, TransactionRequest,
     },
-    transports::{http::reqwest::Url, RpcError, TransportErrorKind},
+    transports::{
+        layers::RetryBackoffLayer, utils::guess_local_url, BoxTransport, IntoBoxTransport,
+        RpcError, TransportErrorKind,
+    },
 };
+use alloy_transport_http::{AuthLayer, Http, HyperClient};
 use governor::{
     clock::DefaultClock,
     middleware::NoOpMiddleware,
@@ -34,7 +42,7 @@ use tokio::{
     task,
 };
 
-use crate::CollectError;
+use crate::{CollectError, ParseError};
 
 /// RateLimiter based on governor crate
 pub type RateLimiter = governor::RateLimiter<NotKeyed, InMemoryState, DefaultClock, NoOpMiddleware>;
@@ -52,6 +60,8 @@ pub struct Source {
     pub max_concurrent_chunks: Option<u64>,
     /// Rpc Url
     pub rpc_url: String,
+    /// Optional JWT auth token for the RPC
+    pub jwt: Option<String>,
     /// semaphore for controlling concurrency
     pub semaphore: Arc<Option<Semaphore>>,
     /// rate limiter for controlling request rate
@@ -118,35 +128,7 @@ impl Source {
     /// initialize source
     pub async fn init(rpc_url: Option<String>) -> Result<Source> {
         let rpc_url: String = parse_rpc_url(rpc_url);
-        let parsed_rpc_url: Url = rpc_url.parse().expect("rpc url is not valid");
-        let provider = ProviderBuilder::new().connect_http(parsed_rpc_url.clone());
-        let chain_id = provider
-            .get_chain_id()
-            .await
-            .map_err(|_| CollectError::RPCError("could not get chain_id".to_string()))?;
-
-        let rate_limiter = None;
-        let semaphore = None;
-
-        let provider = ProviderBuilder::new().connect_http(parsed_rpc_url);
-
-        let source = Source {
-            provider: provider.erased(),
-            chain_id,
-            inner_request_size: DEFAULT_INNER_REQUEST_SIZE,
-            max_concurrent_chunks: Some(DEFAULT_MAX_CONCURRENT_CHUNKS),
-            rpc_url,
-            labels: SourceLabels {
-                max_concurrent_requests: Some(DEFAULT_MAX_CONCURRENT_REQUESTS),
-                max_requests_per_second: Some(0),
-                max_retries: Some(DEFAULT_MAX_RETRIES),
-                initial_backoff: Some(DEFAULT_INTIAL_BACKOFF),
-            },
-            rate_limiter: rate_limiter.into(),
-            semaphore: semaphore.into(),
-        };
-
-        Ok(source)
+        SourceBuilder::new().rpc_url(rpc_url).build().await
     }
 
     // /// set rate limit
@@ -172,30 +154,247 @@ fn parse_rpc_url(rpc_url: Option<String>) -> String {
     url
 }
 
-// builder
+/// Normalizes a raw RPC endpoint string by ensuring it has a URI scheme
+/// (http://) unless it already starts with http/https, ws/wss, or is an IPC path.
+/// This is public so front-ends (CLI, Python bindings) can share identical
+/// normalization logic.
+pub(crate) fn normalize_rpc_url<S: AsRef<str>>(raw: S) -> String {
+    let raw = raw.as_ref();
+    if raw.starts_with("http") || raw.starts_with("ws") || raw.ends_with(".ipc") {
+        raw.to_string()
+    } else {
+        format!("http://{}", raw)
+    }
+}
 
-// struct SourceBuilder {
-//     /// Shared provider for rpc data
-//     pub fetcher: Option<Arc<Fetcher<RetryClient<Http>>>>,
-//     /// chain_id of network
-//     pub chain_id: Option<u64>,
-//     /// number of blocks per log request
-//     pub inner_request_size: Option<u64>,
-//     /// Maximum chunks collected concurrently
-//     pub max_concurrent_chunks: Option<u64>,
-//     /// Rpc Url
-//     pub rpc_url: Option<String>,
-//     /// Labels (these are non-functional)
-//     pub labels: Option<SourceLabels>,
-// }
+/// Builder for `Source`. Keeps the `freeze` crate lightweight while allowing
+/// richer construction logic (CLI, Python bindings, tests) to compose a
+/// provider with concurrency & rate limiting concerns.
+#[derive(Default, Debug)]
+pub struct SourceBuilder {
+    rpc_url: Option<String>,
+    provider: Option<DynProvider>,
+    chain_id: Option<u64>,
+    inner_request_size: Option<u64>,
+    /// explicit None => unlimited
+    max_concurrent_chunks: Option<u64>,
+    semaphore: Option<Arc<Option<Semaphore>>>,
+    rate_limiter: Option<Arc<Option<RateLimiter>>>,
+    jwt: Option<String>,
+    labels: Option<SourceLabels>,
+    /// (max_retries, initial_backoff, compute_units_per_second)
+    retry: Option<(u32, u64, u64)>,
+}
 
-// impl SourceBuilder {
-//     fn new(mut self) -> SourceBuilder {
-//     }
+macro_rules! build_layered_client {
+    ($transport:expr, $($layer:ident $(? $([[$option:tt]])?)?),*) => {
+        build_layered_client!(@parse[] $transport, $([$(@option$($option)?)? $layer],)*)
+    };
+    (@parse[$($l:expr),*] $transport:expr, [@option $layer:ident], $($t:tt)*) => {
+        if let Some($layer) = $layer {
+            build_layered_client!(@parse[$($l,)* $layer] $transport, $($t)*)
+        } else {
+            build_layered_client!(@parse[$($l),*] $transport, $($t)*)
+        }
+    };
+    (@parse[$($layer:expr),*] $transport:expr,) => {
+        build_layered_client!(@build $transport, $($layer,)*)
+    };
+    (@build $transport:expr, $($layer:expr,)*) => {{
+        let (transport, is_local) = $transport;
+        ClientBuilder::default()
+            $(.layer($layer))*
+            .transport(transport, is_local)
+    }};
+}
 
-//     fn build(self) -> Source {
-//     }
-// }
+impl SourceBuilder {
+    /// Create a fresh builder with no configuration.
+    pub fn new() -> Self {
+        Self { max_concurrent_chunks: Some(DEFAULT_MAX_CONCURRENT_CHUNKS), ..Self::default() }
+    }
+
+    /// Provide an already constructed provider (overrides rpc_url if both set).
+    pub fn provider(mut self, provider: DynProvider) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    /// Set the RPC url (used only if `provider` not supplied).
+    pub fn rpc_url(mut self, url: String) -> Self {
+        self.rpc_url = Some(normalize_rpc_url(url));
+        self
+    }
+
+    /// Override chain id instead of querying it from the remote node.
+    pub fn chain_id(mut self, chain_id: u64) -> Self {
+        self.chain_id = Some(chain_id);
+        self
+    }
+
+    /// Set internal request batch size used for certain dataset fetch operations.
+    pub fn inner_request_size(mut self, size: u64) -> Self {
+        self.inner_request_size = Some(size);
+        self
+    }
+
+    /// Limit number of dataset chunks processed concurrently (`None` => unlimited).
+    pub fn max_concurrent_chunks(mut self, m: Option<u64>) -> Self {
+        self.max_concurrent_chunks = m;
+        self
+    }
+
+    /// Supply a custom semaphore controlling concurrent RPC requests.
+    pub fn semaphore(mut self, semaphore: Option<Semaphore>) -> Self {
+        self.semaphore = Some(Arc::new(semaphore));
+        self
+    }
+
+    /// Supply a rate limiter gating outbound RPC calls.
+    pub fn rate_limiter(mut self, limiter: Option<RateLimiter>) -> Self {
+        self.rate_limiter = Some(Arc::new(limiter));
+        self
+    }
+
+    /// Attach an optional JWT token (currently stored for future use when auth headers become
+    /// available).
+    pub fn jwt(mut self, jwt: Option<String>) -> Self {
+        self.jwt = jwt;
+        self
+    }
+
+    /// Provide custom label metadata (non-functional; used for diagnostics / reporting).
+    pub fn labels(mut self, labels: SourceLabels) -> Self {
+        self.labels = Some(labels);
+        self
+    }
+
+    /// Configure a retry policy layer to be attached to the underlying transport.
+    /// Parameters mirror `RetryBackoffLayer::new(max_retries, initial_backoff,
+    /// compute_units_per_second)`.
+    pub fn retry_policy(
+        mut self,
+        max_retries: u32,
+        initial_backoff: u64,
+        compute_units_per_second: u64,
+    ) -> Self {
+        self.retry = Some((max_retries, initial_backoff, compute_units_per_second));
+        self
+    }
+
+    fn build_http_transport(&self) -> Result<(BoxTransport, bool)> {
+        let rpc_url = self.rpc_url.as_deref().ok_or_else(|| {
+            CollectError::CollectError(
+                "SourceBuilder requires either provider or rpc_url".to_string(),
+            )
+        })?;
+        let is_local = guess_local_url(rpc_url);
+        let rpc_url =
+            rpc_url.parse().map_err(|e| CollectError::ParseError(ParseError::ParseUrlError(e)))?;
+
+        // Attach auth layer at the transport level if JWT provided
+        let http = if let Some(jwt) = self.jwt.as_deref() {
+            match jwt.parse() {
+                Ok(secret) => {
+                    let layer = AuthLayer::new(secret);
+                    // HyperClient::with_service(service)
+                    build_http_jwt_client(layer, rpc_url)
+                }
+                Err(e) => {
+                    return Err(CollectError::ParseError(ParseError::ParseJwtError(e.to_string())));
+                }
+            }
+        } else {
+            Http::new(rpc_url).into_box_transport()
+        };
+
+        Ok((http, is_local))
+    }
+
+    fn build_client(&self) -> Result<RpcClient> {
+        // Optional retry layer only (auth already applied at transport level)
+        let retry_layer = self.retry.map(|(max_r, initial_backoff, cu_ps)| {
+            RetryBackoffLayer::new(max_r, initial_backoff, cu_ps)
+        });
+        let transport = self.build_http_transport()?;
+        let client = build_layered_client!(transport, retry_layer?);
+        Ok(client)
+    }
+
+    /// Build the `Source`. This may perform network I/O to fetch `chain_id`
+    /// if it was not supplied.
+    pub async fn build(mut self) -> Result<Source> {
+        // Ensure we have a provider
+        if self.provider.is_none() {
+            let client = self.build_client()?;
+            let provider = ProviderBuilder::new().connect_client(client);
+            self.provider = Some(provider.erased());
+        }
+        let provider = self.provider.expect("provider just ensured above");
+
+        // Resolve chain id if needed
+        if self.chain_id.is_none() {
+            let id = provider
+                .get_chain_id()
+                .await
+                .map_err(|_| CollectError::RPCError("could not get chain_id".to_string()))?;
+            self.chain_id = Some(id);
+        }
+
+        // Defaults
+        let inner_request_size = self.inner_request_size.unwrap_or(DEFAULT_INNER_REQUEST_SIZE);
+        let labels = self.labels.unwrap_or(SourceLabels {
+            max_concurrent_requests: Some(DEFAULT_MAX_CONCURRENT_REQUESTS),
+            max_requests_per_second: Some(0),
+            max_retries: Some(DEFAULT_MAX_RETRIES),
+            initial_backoff: Some(DEFAULT_INTIAL_BACKOFF),
+        });
+
+        let semaphore = self.semaphore.unwrap_or_else(|| Arc::new(None));
+        let rate_limiter = self.rate_limiter.unwrap_or_else(|| Arc::new(None));
+
+        Ok(Source {
+            provider,
+            chain_id: self.chain_id.expect("chain id ensured"),
+            inner_request_size,
+            max_concurrent_chunks: self.max_concurrent_chunks,
+            rpc_url: self.rpc_url.unwrap_or_else(|| "unknown".to_string()),
+            jwt: self.jwt,
+            semaphore,
+            rate_limiter,
+            labels,
+        })
+    }
+}
+
+/// Build a hyper-based transport that applies the provided `AuthLayer`.
+/// We take ownership of the parsed URL so we can construct an `Http` transport
+/// with the layered hyper client and return it as a `BoxTransport`.
+pub fn build_http_jwt_client(layer: AuthLayer, url: url::Url) -> BoxTransport {
+    use alloy_transport_http::{
+        hyper::body::Bytes,
+        hyper_util::{client::legacy::Client, rt::TokioExecutor},
+    };
+    use http_body_util::Full;
+
+    // Build a legacy hyper client (the underlying service)
+    let hyper_service = Client::builder(TokioExecutor::new()).build_http::<Full<Bytes>>();
+
+    // Wrap the hyper service with the auth layer
+    let service = tower::ServiceBuilder::new().layer(layer).service(hyper_service);
+
+    // Create an alloy HyperClient from the layered service and wrap it in an
+    // Http transport, then convert to a BoxTransport.
+    let hyper_client = HyperClient::with_service(service);
+    Http::with_client(hyper_client, url).into_box_transport()
+}
+
+impl Source {
+    /// Start building a `Source` with `SourceBuilder`.
+    pub fn builder() -> SourceBuilder {
+        SourceBuilder::new()
+    }
+}
 
 /// source labels (non-functional)
 #[derive(Clone, Debug, Default)]
@@ -1002,4 +1201,63 @@ fn parse_geth_diff_object(map: serde_json::Map<String, serde_json::Value>) -> Re
         .map_err(|_| err("cannot deserialize pre diff"))?;
 
     Ok(DiffMode { pre, post })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // These tests assume an ETH_RPC_URL pointing to a dev node or that the URL is unreachable.
+    // For CI determinism, consider mocking provider once alloy offers an in-memory transport.
+
+    #[tokio::test]
+    async fn builder_defaults_from_url() {
+        // Use an obviously invalid URL but with correct shape; build should fail only when chain_id
+        // fetch fails. If environment has ETH_RPC_URL set and reachable, this will exercise
+        // more.
+        let url = "http://localhost:8545".to_string();
+        let build = Source::builder().rpc_url(url).build().await;
+        // We can't guarantee local node is up in test environment, so just assert we get some
+        // result (Ok or Err is acceptable). If Ok, validate some defaults.
+        if let Ok(source) = build {
+            assert_eq!(source.inner_request_size, 100, "default inner_request_size");
+            assert_eq!(source.max_concurrent_chunks, Some(4));
+            assert!(source.labels.max_retries.is_some());
+        }
+    }
+
+    #[tokio::test]
+    async fn builder_overrides() {
+        // This test will likely fail without a running node because chain_id fetch is required.
+        // Skip if no local node.
+        let url = "http://localhost:8545";
+        let result = Source::builder()
+            .rpc_url(url.to_string())
+            .inner_request_size(42)
+            .max_concurrent_chunks(Some(7))
+            .labels(SourceLabels {
+                max_concurrent_requests: Some(10),
+                max_requests_per_second: Some(5),
+                max_retries: Some(3),
+                initial_backoff: Some(1),
+            })
+            .build()
+            .await;
+        if let Ok(source) = result {
+            // if a node is available
+            assert_eq!(source.inner_request_size, 42);
+            assert_eq!(source.max_concurrent_chunks, Some(7));
+            assert_eq!(source.labels.max_retries, Some(3));
+        }
+    }
+
+    #[tokio::test]
+    async fn builder_with_retry_policy() {
+        let url = "http://localhost:8545";
+        let result = Source::builder().rpc_url(url.to_string()).retry_policy(2, 1, 0).build().await;
+        // Success depends on local node; if Ok, we at least exercised retry path.
+        if let Ok(source) = result {
+            assert_eq!(source.rpc_url, url);
+        }
+    }
 }

@@ -25,8 +25,9 @@ jobs:
           cache-on-failure: true
       - name: Build
         run: cargo build --workspace
-      - name: Build with rustls
-        run: cargo build --workspace --features reqwest-rustls-tls --no-default-features
+      # out of disk
+      # - name: Build with rustls
+      #   run: cargo build --workspace --features reqwest-rustls-tls --no-default-features
       - name: Run tests
         run: cargo test --workspace -j1
   clippy:

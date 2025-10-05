@@ -94,6 +94,10 @@ pub struct Args {
     #[arg(short, long, help_heading = "Source Options")]
     pub rpc: Option<String>,
 
+    /// JWT auth token for RPC (Bearer), can also be provided via ETH_RPC_JWT env var
+    #[arg(long, help_heading = "Source Options")]
+    pub jwt: Option<String>,
+
     /// Network name [default: name of eth_getChainId]
     #[arg(long, help_heading = "Source Options")]
     pub network_name: Option<String>,
