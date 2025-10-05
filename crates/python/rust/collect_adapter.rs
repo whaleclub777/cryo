@@ -135,7 +135,7 @@ pub fn _collect(
     if let Some(command) = command {
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run_execute(command).await {
-                Ok(df) => Ok(PyDataFrame { df }),
+                Ok(df) => Ok(PyDataFrame { df: df.into() }),
                 Err(_e) => Err(PyErr::new::<PyTypeError, _>("failed")),
             }
         })
@@ -203,7 +203,7 @@ pub fn _collect(
         pyo3_async_runtimes::tokio::future_into_py(py, async move {
             match run_collect(args).await {
                 // Ok(df) => Ok(Python::with_gil(|py| py.None())),
-                Ok(df) => Ok(PyDataFrame { df }),
+                Ok(df) => Ok(PyDataFrame { df: df.into() }),
                 Err(_e) => Err(PyErr::new::<PyTypeError, _>("failed")),
             }
         })
