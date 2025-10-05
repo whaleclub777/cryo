@@ -20,7 +20,7 @@ path = "src/main.rs"
 [dependencies]
 alloy = { workspace = true }
 anstyle = { workspace = true }
-clap_cryo = { workspace = true }
+clap = { workspace = true }
 color-print = { workspace = true }
 colored = { workspace = true }
 cryo_freeze = { workspace = true }

@@ -1,5 +1,5 @@
 use crate::{args, parse, remember};
-use clap_cryo::Parser;
+use clap::Parser;
 use color_print::cstr;
 use colored::Colorize;
 use cryo_freeze::{err, CollectError, ExecutionEnv, FreezeSummary};

@@ -28,7 +28,7 @@ alloy-transport-http = { version = "1.0.9", default-features = false, features =
 anstyle = "1.0.4"
 async-trait = "0.1.74"
 chrono = { version = "0.4.31", features = ["serde"] }
-clap_cryo = { version = "4.3.21-cryo", features = [
+clap = { version = "4.3.21", features = [
     "derive",
     "color",
     "unstable-styles",
