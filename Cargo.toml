@@ -24,7 +24,7 @@ alloy = { version = "1.0.9", default-features = false, features = [
     "full",
     "transport-ipc-mock",
 ] }
-alloy-transport-http = { version = "1.0.9", features = ["jwt-auth"] }
+alloy-transport-http = { version = "1.0.9", default-features = false, features = ["jwt-auth"] }
 anstyle = "1.0.4"
 async-trait = "0.1.74"
 chrono = { version = "0.4.31", features = ["serde"] }
