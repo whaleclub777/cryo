@@ -74,15 +74,15 @@ jobs:
           - os: ubuntu-latest
             arch: x86_64
             target: x86_64-unknown-linux-gnu
-          # - os: ubuntu-latest
-          #   arch: aarch64
-          #   target: aarch64-unknown-linux-gnu
+          - os: ubuntu-latest
+            arch: aarch64
+            target: aarch64-unknown-linux-gnu
           - os: windows-latest
             arch: x86_64
             target: x86_64-pc-windows-msvc
-          # - os: windows-latest
-          #   arch: aarch64
-          #   target: aarch64-pc-windows-msvc
+          - os: windows-latest
+            arch: aarch64
+            target: aarch64-pc-windows-msvc
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -92,6 +92,19 @@ jobs:
 
       - name: Install rust target
         run: rustup target add ${{ matrix.target }}
+
+      - name: Install cross-compilation tools (Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Configure cargo for cross-compilation (Linux aarch64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          mkdir -p ~/.cargo
+          echo "[target.aarch64-unknown-linux-gnu]" >> ~/.cargo/config.toml
+          echo "linker = \"aarch64-linux-gnu-gcc\"" >> ~/.cargo/config.toml
 
       - name: Build CLI (release)
         run: |
