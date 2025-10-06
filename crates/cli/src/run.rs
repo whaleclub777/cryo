@@ -1,5 +1,5 @@
 use crate::{args, parse, remember};
-use clap_cryo::Parser;
+use clap::Parser;
 use color_print::cstr;
 use colored::Colorize;
 use cryo_freeze::{err, CollectError, ExecutionEnv, FreezeSummary};
@@ -43,7 +43,7 @@ fn load_or_remember_command(
     let remembered = remember::load_remembered_command(cryo_dir.to_path_buf())?;
     // Warn if the remembered command comes from a different Cryo version.
     if remembered.cryo_version != cryo_freeze::CRYO_VERSION {
-        eprintln!("remembered command comes from a different Cryo version, proceed with caution\n");
+        warn!("remembered command comes from a different Cryo version, proceed with caution\n");
     }
     print_remembered_command(&remembered.command);
     args = args.merge_with_precedence(remembered.args);

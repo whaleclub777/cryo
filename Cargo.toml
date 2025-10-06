@@ -28,7 +28,7 @@ alloy-transport-http = { version = "1.0.9", default-features = false, features =
 anstyle = "1.0.4"
 async-trait = "0.1.74"
 chrono = { version = "0.4.31", features = ["serde"] }
-clap_cryo = { version = "4.3.21-cryo", features = [
+clap = { version = "4.3.21", features = [
     "derive",
     "color",
     "unstable-styles",
@@ -65,6 +65,7 @@ serde_json = "1.0.108"
 thiserror = "2.0"
 thousands = "0.2.0"
 tokio = { version = "1.33.0", features = ["macros", "rt-multi-thread", "sync"] }
+tracing = "0.1.41"
 
 [profile.dev]
 incremental = true
